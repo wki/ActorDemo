@@ -6,5 +6,6 @@ public enum ActorState
     Idle,
     Running,
     Faulty,
+    Restarting,
     Stopped,
 }

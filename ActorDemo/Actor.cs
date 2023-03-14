@@ -66,5 +66,30 @@ public abstract class Actor
     public void Tell(IActorRef receiver, object message) =>
         receiver.SendMessage(Self, receiver, message);
 
+    /// <summary>
+    /// Reply to sender with a given message
+    /// </summary>
+    /// <param name="message"></param>
+    public void Reply(object message) =>
+        MyMailboxProcessor.Reply(message);
+
+    public void Forward(IActorRef receiver) =>
+        MyMailboxProcessor.Forward(receiver);
+
+    /// <summary>
+    /// put the currently processed message onto Stash (typically in BeforeRestart hook)
+    /// </summary>
+    public void Stash() => MyMailboxProcessor.Stash();
+    
+    /// <summary>
+    /// Clear the entire stash
+    /// </summary>
+    public void ClearStash() => MyMailboxProcessor.ClearStash();
+    
+    /// <summary>
+    /// Recover all messages from stash and put them into our mailbox
+    /// </summary>
+    public void UnStashAll() => MyMailboxProcessor.UnStashAll();
+    
     public override string ToString() => MyMailboxProcessor.ToString();
 }
