@@ -1,81 +1,7 @@
 namespace ActorDemo;
 
-public interface IActorRef
-{
-    void SendMessage(IActorRef sender, IActorRef receiver, object message);
-}
-
-public record Envelope(IActorRef Sender, IActorRef Receiver, object Message);
-
-public class MailboxProcessor: IActorRef
-{
-    public IActorRef Parent;
-    public string Name { get; }
-    private readonly Actor _actor;
-    private readonly Queue<Envelope> _mailbox = new Queue<Envelope>();
-    private Envelope? _currentlyProcessing = null;
-    // semaphore for locking
-    private object _mailboxAccess = new object();
-
-    public MailboxProcessor(string name, IActorRef parent, Actor actor)
-    {
-        Name = name;
-        Parent = parent;
-        _actor = actor;
-    }
-
-    public void SendMessage(IActorRef sender, IActorRef receiver, object message) =>
-        EnqueueMessage(new Envelope(sender, receiver, message));
-
-    private void EnqueueMessage(Envelope envelope)
-    {
-        lock (_mailboxAccess)
-        {
-            _mailbox.Enqueue(envelope);
-            ProcessNextMessage();
-        }
-    }
-
-    // check queue if we can continue with a new message
-    // CAUTION: must be called when inside a lock(_mailboxAccess)
-    private void ProcessNextMessage()
-    {
-        if (_currentlyProcessing is null)
-        {
-            _currentlyProcessing = _mailbox.Dequeue();
-            _actor.Sender = _currentlyProcessing.Sender;
-            _actor
-                .OnReceiveAsync(_currentlyProcessing.Message)
-                .ContinueWith(MessageProcessed);
-        }
-    }
-
-    // last message was processed. go on.
-    private void MessageProcessed(Task task)
-    {
-        if (task.IsCanceled)
-        {
-            // currently impossible
-        }
-        else if (task.IsFaulted)
-        {
-            // TODO: error handling
-        }
-        else
-        {
-            lock (_mailboxAccess)
-            {
-                _currentlyProcessing = null;
-                ProcessNextMessage();
-            }
-        }
-    }
-
-    public override string ToString() => $"Actor '{Name}'";
-}
-
 /// <summary>
-/// Base Class for every Actor and ActorSystem (contains user code)
+/// Base Class for every Actor and ActorSystem (contains user code for actor)
 /// </summary>
 public abstract class Actor
 {
@@ -83,7 +9,7 @@ public abstract class Actor
     /// Sender of the message currently processed
     /// </summary>
     public IActorRef Sender { get; set; }
-    
+
     /// <summary>
     /// my own reference
     /// </summary>
@@ -94,6 +20,8 @@ public abstract class Actor
     protected string Name => MyMailboxProcessor.Name;
 
     protected IActorRef Parent => MyMailboxProcessor.Parent;
+
+    protected IReadOnlyList<IActorRef> Children => MyMailboxProcessor.Children;
 
     protected Actor() {}
 
@@ -111,9 +39,17 @@ public abstract class Actor
                 .Invoke(args)
             as T;
         
-        actor.Self = new MailboxProcessor(name, Self, actor);
+        var mailboxProcessor = new MailboxProcessor(name, MyMailboxProcessor, actor);
+        actor.Self = mailboxProcessor;
+        mailboxProcessor.Start();
+        
         return actor.Self;
     }
+
+    public void AfterStart() {}
+    public void BeforeStop() {}
+    public void BeforeRestart(Exception e, object message) {}
+    public void AfterRestart() {}
 
     /// <summary>
     /// must be implemented to handle a single message async
@@ -131,22 +67,4 @@ public abstract class Actor
         receiver.SendMessage(Self, receiver, message);
 
     public override string ToString() => MyMailboxProcessor.ToString();
-}
-
-/// <summary>
-/// Actor System containing all actors
-/// </summary>
-/// <param name="message"></param>
-public class ActorSystem: Actor
-{
-    public ActorSystem(string name)
-    {
-        Self = new MailboxProcessor(name, null, this);
-    }
-
-    public override Task OnReceiveAsync(object message)
-    {
-        Console.WriteLine($"system received message: {message}");
-        return Task.CompletedTask;
-    }
 }
