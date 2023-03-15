@@ -98,6 +98,7 @@ public class MailboxProcessor: IActorRef
         if (_state == ActorState.Idle && _mailbox.Any())
         {
             _currentlyProcessing = _mailbox.Dequeue();
+            // Console.WriteLine($"Processing {_currentlyProcessing.Sender}->{_currentlyProcessing.Receiver}: {_currentlyProcessing.Message}");
             _state = ActorState.Running;
             _actor.Sender = _currentlyProcessing.Sender;
             _actor

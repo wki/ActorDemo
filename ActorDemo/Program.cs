@@ -9,6 +9,22 @@ var initiator = system.ActorOf<Initiator>("sender", receiver);
 // send a message to initiator. Origin === system.
 // replies to here would be a dead letter...
 system.Tell(initiator, new Ping("hello"));
+
+// ask an actor for a result (async)
+var result = system.Ask<int>(initiator, new MeaningOfLife()).GetAwaiter().GetResult();
+Console.WriteLine($"Received answer: {result}");
+
+try
+{
+    var result2 = system.Ask<int>(initiator, 42).GetAwaiter().GetResult();
+    Console.WriteLine($"Received answer2: {result2} -- should not occur");
+}
+catch (Exception e)
+{
+    Console.WriteLine(e);
+}
+
+// do something to keep actorsystem alive...
 Thread.Sleep(TimeSpan.FromSeconds(30));
 
 // -----------------
@@ -17,6 +33,8 @@ Thread.Sleep(TimeSpan.FromSeconds(30));
 public record Ping(string Message);
 
 public record Pong(string Answer);
+
+public record MeaningOfLife();
 
 public record StopTimer();
 
@@ -64,9 +82,13 @@ public class Initiator : Actor
             case StopTimer:
                 Console.WriteLine($"{Self} StopTimer received");
                 return _timer.DisposeAsync().AsTask();
+            case MeaningOfLife:
+                Console.WriteLine($"{Self} MeaningOfLife received, sender: {Sender}");
+                Reply(42);
+                return Task.CompletedTask;
         }
 
-        Console.WriteLine($"{Self}: unhandled Message: {message}");
+        Console.WriteLine($"{Self}: unhandled Message: {message}, sender: {Sender}");
         return Task.CompletedTask;
     }
 }

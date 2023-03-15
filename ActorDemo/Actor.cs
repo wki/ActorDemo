@@ -1,3 +1,5 @@
+using ActorDemo.Ask;
+
 namespace ActorDemo;
 
 /// <summary>
@@ -34,6 +36,15 @@ public abstract class Actor
     public IActorRef ActorOf<T>(string name, params object[] args)
         where T : Actor
     {
+        if (name.Contains('*'))
+        {
+            var randomPart = 
+                Path.GetRandomFileName()
+                    .Replace(".", "")
+                    .Substring(0, 8);
+            name = name.Replace("*", randomPart);
+        }
+        
         var actor = typeof(T)
                 .GetConstructor(args.Select(a => a.GetType()).ToArray())
                 .Invoke(args)
@@ -46,10 +57,10 @@ public abstract class Actor
         return actor.Self;
     }
 
-    public void AfterStart() {}
-    public void BeforeStop() {}
-    public void BeforeRestart(Exception e, object message) {}
-    public void AfterRestart() {}
+    public virtual void AfterStart() {}
+    public virtual void BeforeStop() {}
+    public virtual void BeforeRestart(Exception e, object message) {}
+    public virtual void AfterRestart() {}
 
     /// <summary>
     /// must be implemented to handle a single message async
@@ -73,9 +84,20 @@ public abstract class Actor
     public void Reply(object message) =>
         MyMailboxProcessor.Reply(message);
 
+    /// <summary>
+    /// Forward a message to another actor keeping the sender equal
+    /// </summary>
+    /// <param name="receiver"></param>
     public void Forward(IActorRef receiver) =>
         MyMailboxProcessor.Forward(receiver);
 
+    public Task<T> Ask<T>(IActorRef receiver, object message, int timeOutMillis = 500)
+    {
+        var answer = new TaskCompletionSource<T>();
+        var askActor = ActorOf<AskActor<T>>("ask-*", receiver, message, answer, timeOutMillis);
+        return answer.Task;
+    }
+    
     /// <summary>
     /// put the currently processed message onto Stash (typically in BeforeRestart hook)
     /// </summary>
