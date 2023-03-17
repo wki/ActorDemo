@@ -2,5 +2,5 @@ namespace ActorDemo;
 
 public interface IRestartPolicy
 {
-    bool CanRestart();
+    Task<bool> CanRestartAsync();
 }

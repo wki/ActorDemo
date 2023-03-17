@@ -15,12 +15,12 @@ public class DelayedRestartPolicy: IRestartPolicy
         _delayMillis = delayMillis;
     }
 
-    public bool CanRestart()
+    public async Task<bool> CanRestartAsync()
     {
         if (++_nrRestarts >= _maxRestarts)
             return false;
-        
-        Thread.Sleep(_delayMillis);
+
+        await Task.Delay(_delayMillis);
         return true;
     }
 }

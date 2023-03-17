@@ -86,14 +86,14 @@ public abstract class Actor : IActorBuilder
     /// Reply to sender with a given message
     /// </summary>
     /// <param name="message"></param>
-    public void Reply(object message) =>
+    public void Reply(object message) => 
         MyMailboxProcessor.Reply(message);
 
     /// <summary>
     /// Forward a message to another actor keeping the sender equal
     /// </summary>
     /// <param name="receiver"></param>
-    public void Forward(IActorRef receiver) =>
+    public void Forward(IActorRef receiver) => 
         MyMailboxProcessor.Forward(receiver);
 
     public Task<T> Ask<T>(IActorRef receiver, object message, int timeOutMillis = 500)
@@ -106,17 +106,20 @@ public abstract class Actor : IActorBuilder
     /// <summary>
     /// put the currently processed message onto Stash (typically in BeforeRestart hook)
     /// </summary>
-    public void Stash() => MyMailboxProcessor.Stash();
+    public void Stash() => 
+        MyMailboxProcessor.Stash();
     
     /// <summary>
     /// Clear the entire stash
     /// </summary>
-    public void ClearStash() => MyMailboxProcessor.ClearStash();
+    public void ClearStash() => 
+        MyMailboxProcessor.ClearStash();
     
     /// <summary>
     /// Recover all messages from stash and put them into our mailbox
     /// </summary>
-    public void UnStashAll() => MyMailboxProcessor.UnStashAll();
+    public void UnStashAll() => 
+        MyMailboxProcessor.UnStashAll();
     
-    public override string ToString() => MyMailboxProcessor.ToString();
+    public override string ToString() => $"Actor '{Name}'";
 }

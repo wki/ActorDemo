@@ -1,4 +1,4 @@
-using System.Reflection;
+using System.Threading.Channels;
 
 namespace ActorDemo;
 
@@ -39,11 +39,14 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     private readonly IRestartPolicy _restartPolicy;
 
+    // we are using an unbounded channel as a mailbox
+    private Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
+    
+    // the task which processes our messages
+    private Task _messageLoop;
+    
     // actor with user-provided message handling code and state
     public Actor Actor { get; }
-    
-    // mailbox contains unprocessed messages
-    private readonly Queue<Envelope> _mailbox = new Queue<Envelope>();
     
     // stash contains messages to be processed defered when unstashed
     public readonly Queue<Envelope> _stash = new Queue<Envelope>();
@@ -77,6 +80,7 @@ public class MailboxProcessor: IActorRef
             name = name.Replace("*", randomPart);
         }
 
+        // take first constructor
         // var ctor = actorType.GetConstructors().FirstOrDefault();
         // if (ctor is null)
         //     throw new InvalidOperationException($"Actor {actorType.Name} has no constructur");
@@ -84,6 +88,7 @@ public class MailboxProcessor: IActorRef
         // var actor = ctor.Invoke(args)
         //     as Actor;
         
+        // find matching constructor
         var actor = actorType
                 .GetConstructor(args.Select(a => a.GetType()).ToArray())
                 .Invoke(args)
@@ -121,66 +126,49 @@ public class MailboxProcessor: IActorRef
     public void Forward(IActorRef receiver) =>
         receiver.SendMessage(_currentlyProcessing.Sender, receiver, _currentlyProcessing.Message);
 
-    // low level handling of an envelope including mailbox locking
+    // low level handling of an envelope
     private void EnqueueMessage(Envelope envelope)
     {
-        lock (_mailbox)
-        {
-            _mailbox.Enqueue(envelope);
-            ProcessNextMessageIfIdle();
-        }
+        if (!_mailbox.Writer.TryWrite(envelope))
+            Console.WriteLine($"{this}: could not enqueue Message");
     }
 
-    // check queue if we can continue with a new message
-    // CAUTION: must be called when inside a lock(_mailboxAccess)
-    private void ProcessNextMessageIfIdle()
+    private async Task BuildAndRunMessageLoop()
     {
-        if (_state == ActorState.Idle && _mailbox.Any())
+        while (_state != ActorState.Stopped)
         {
-            _currentlyProcessing = _mailbox.Dequeue();
-            // Console.WriteLine($"Processing {_currentlyProcessing.Sender}->{_currentlyProcessing.Receiver}: {_currentlyProcessing.Message}");
+            _state = ActorState.Idle;
+            _currentlyProcessing = await _mailbox.Reader.ReadAsync();
             _state = ActorState.Running;
             Actor.Sender = _currentlyProcessing.Sender;
-            Actor
-                .OnReceiveAsync(_currentlyProcessing.Message)
-                .ContinueWith(MessageProcessed, TaskContinuationOptions.RunContinuationsAsynchronously);
+            try
+            {
+                await Actor.OnReceiveAsync(_currentlyProcessing.Message);
+            }
+            catch (Exception e)
+            {
+                if (await _restartPolicy.CanRestartAsync())
+                {
+                    HandleFault(e, _currentlyProcessing.Message);
+                    Restart();
+                }
+                else
+                    // Restart Policy forbids a restart.
+                    break;
+            }
         }
+
+        Stop();
     }
+    #endregion
 
-    // last message was processed. go on.
-    private void MessageProcessed(Task messageProcessingTask)
-    {
-        if (messageProcessingTask.IsFaulted)
-        {
-            Fault(messageProcessingTask.Exception, _currentlyProcessing.Message);
-
-            if (_restartPolicy.CanRestart())
-                Restart();
-            else
-                Stop();
-        }
-        else
-            IdleAndCheckForNextMessage();
-    }
-
-    // run an actor's hook ignoring exceptions
+    #region State handling
     private void RunHook(Action hook)
     {
         try { hook(); }
         catch (Exception _) { }
     }
 
-    private void IdleAndCheckForNextMessage()
-    {
-        lock (_mailbox)
-        {
-            Idle();
-            ProcessNextMessageIfIdle();
-        }
-    }
-    #endregion
-
-    #region State handling
     /// <summary>
     /// Start processing messages
     /// </summary>
@@ -188,15 +176,7 @@ public class MailboxProcessor: IActorRef
     {
         _state = ActorState.Idle;
         RunHook(() => Actor.AfterStart());
-    }
-
-    /// <summary>
-    /// Idle message processing. Will wait until another message arrives
-    /// </summary>
-    public void Idle()
-    {
-        _currentlyProcessing = null;
-        _state = ActorState.Idle;
+        _messageLoop = BuildAndRunMessageLoop();
     }
 
     /// <summary>
@@ -204,7 +184,7 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     /// <param name="exception"></param>
     /// <param name="message"></param>
-    public void Fault(AggregateException exception, object message)
+    public void HandleFault(Exception exception, object message)
     {
         _state = ActorState.Faulty;
         RunHook(() => Actor.BeforeRestart(exception, message));
@@ -217,7 +197,6 @@ public class MailboxProcessor: IActorRef
     {
         _state = ActorState.Restarting;
         RunHook(() => Actor.AfterRestart());
-        IdleAndCheckForNextMessage();
     }
     
     /// <summary>
@@ -284,5 +263,5 @@ public class MailboxProcessor: IActorRef
     }
     #endregion
     
-    public override string ToString() => $"Actor '{Name}'";
+    public override string ToString() => $"ActorRef '{Name}'";
 }

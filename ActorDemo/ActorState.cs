@@ -2,10 +2,10 @@ namespace ActorDemo;
 
 public enum ActorState
 {
-    Initializing,
-    Idle,
-    Running,
-    Faulty,
+    Initializing,       // Actor construction
+    Idle,               // waiting for mailbox messages
+    Running,            // processing a message
+    Faulty,             // in error processing
     Restarting,
     Stopped,
 }
