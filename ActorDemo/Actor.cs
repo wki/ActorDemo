@@ -1,3 +1,4 @@
+using ActorDemo.Routing;
 using ActorDemo.Ask;
 
 namespace ActorDemo;
@@ -5,7 +6,7 @@ namespace ActorDemo;
 /// <summary>
 /// Base Class for every Actor and ActorSystem (contains user code for actor)
 /// </summary>
-public abstract class Actor
+public abstract class Actor : IActorBuilder
 {
     /// <summary>
     /// Sender of the message currently processed
@@ -13,17 +14,18 @@ public abstract class Actor
     public IActorRef Sender { get; set; }
 
     /// <summary>
-    /// my own reference
+    /// my own reference (actually to our MailboxProcessor)
     /// </summary>
-    protected IActorRef Self { get; set; }
+    public IActorRef Self { get; internal set; }
     
-    private MailboxProcessor MyMailboxProcessor => Self as MailboxProcessor; 
+    // convenient and type-safe access to our Mailbox Processor
+    internal MailboxProcessor MyMailboxProcessor => Self as MailboxProcessor; 
 
-    protected string Name => MyMailboxProcessor.Name;
+    public string Name => MyMailboxProcessor.Name;
 
-    protected IActorRef Parent => MyMailboxProcessor.Parent;
+    public IActorRef Parent => MyMailboxProcessor.Parent;
 
-    protected IReadOnlyList<IActorRef> Children => MyMailboxProcessor.Children;
+    public IReadOnlyList<IActorRef> Children => MyMailboxProcessor.Children;
 
     protected Actor() {}
 
@@ -34,28 +36,31 @@ public abstract class Actor
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
     public IActorRef ActorOf<T>(string name, params object[] args)
-        where T : Actor
-    {
-        if (name.Contains('*'))
-        {
-            var randomPart = 
-                Path.GetRandomFileName()
-                    .Replace(".", "")
-                    .Substring(0, 8);
-            name = name.Replace("*", randomPart);
-        }
-        
-        var actor = typeof(T)
-                .GetConstructor(args.Select(a => a.GetType()).ToArray())
-                .Invoke(args)
-            as T;
-        
-        var mailboxProcessor = new MailboxProcessor(name, MyMailboxProcessor, actor);
-        actor.Self = mailboxProcessor;
-        mailboxProcessor.Start();
-        
-        return actor.Self;
-    }
+        where T : Actor => MyMailboxProcessor.ActorOf<T>(name, args);
+    // {
+    //     if (name.Contains('*'))
+    //     {
+    //         var randomPart = 
+    //             Path.GetRandomFileName()
+    //                 .Replace(".", "")
+    //                 .Substring(0, 8);
+    //         name = name.Replace("*", randomPart);
+    //     }
+    //     
+    //     var actor = typeof(T)
+    //             .GetConstructor(args.Select(a => a.GetType()).ToArray())
+    //             .Invoke(args)
+    //         as T;
+    //     
+    //     var mailboxProcessor = new MailboxProcessor(name, MyMailboxProcessor, actor);
+    //     actor.Self = mailboxProcessor;
+    //     mailboxProcessor.Start();
+    //     
+    //     return actor.Self;
+    // }
+
+    public ActorBuilder WithRouter(IRoutingStrategy routingStrategy) =>
+        new RouterBuilder(MyMailboxProcessor, routingStrategy);
 
     public virtual void AfterStart() {}
     public virtual void BeforeStop() {}

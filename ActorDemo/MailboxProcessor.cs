@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace ActorDemo;
 
 /// <summary>
@@ -32,10 +34,13 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     public string Name { get; }
 
+    /// <summary>
+    /// Handles restarting an actor in case of failure possibly with delays
+    /// </summary>
     private readonly IRestartPolicy _restartPolicy;
 
     // actor with user-provided message handling code and state
-    private readonly Actor _actor;
+    public Actor Actor { get; }
     
     // mailbox contains unprocessed messages
     private readonly Queue<Envelope> _mailbox = new Queue<Envelope>();
@@ -53,9 +58,44 @@ public class MailboxProcessor: IActorRef
 
         Name = name;
         Parent = parent;
-        _actor = actor;
+        Actor = actor;
         _restartPolicy = new DelayedRestartPolicy();
     }
+    
+    #region Actor creation
+    public IActorRef ActorOf<T>(string name, params object[] args)
+        where T : Actor => ActorOf(typeof(T), name, args);
+    
+    public IActorRef ActorOf(Type actorType, string name, params object[] args)
+    {
+        if (name.Contains('*'))
+        {
+            var randomPart = 
+                Path.GetRandomFileName()
+                    .Replace(".", "")
+                    .Substring(0, 8);
+            name = name.Replace("*", randomPart);
+        }
+
+        // var ctor = actorType.GetConstructors().FirstOrDefault();
+        // if (ctor is null)
+        //     throw new InvalidOperationException($"Actor {actorType.Name} has no constructur");
+        //
+        // var actor = ctor.Invoke(args)
+        //     as Actor;
+        
+        var actor = actorType
+                .GetConstructor(args.Select(a => a.GetType()).ToArray())
+                .Invoke(args)
+            as Actor;
+        
+        var mailboxProcessor = new MailboxProcessor(name, this, actor);
+        actor.Self = mailboxProcessor;
+        mailboxProcessor.Start();
+        
+        return mailboxProcessor;
+    }
+    #endregion
 
     #region Message handling
     /// <summary>
@@ -100,8 +140,8 @@ public class MailboxProcessor: IActorRef
             _currentlyProcessing = _mailbox.Dequeue();
             // Console.WriteLine($"Processing {_currentlyProcessing.Sender}->{_currentlyProcessing.Receiver}: {_currentlyProcessing.Message}");
             _state = ActorState.Running;
-            _actor.Sender = _currentlyProcessing.Sender;
-            _actor
+            Actor.Sender = _currentlyProcessing.Sender;
+            Actor
                 .OnReceiveAsync(_currentlyProcessing.Message)
                 .ContinueWith(MessageProcessed, TaskContinuationOptions.RunContinuationsAsynchronously);
         }
@@ -147,7 +187,7 @@ public class MailboxProcessor: IActorRef
     public void Start()
     {
         _state = ActorState.Idle;
-        RunHook(() => _actor.AfterStart());
+        RunHook(() => Actor.AfterStart());
     }
 
     /// <summary>
@@ -167,7 +207,7 @@ public class MailboxProcessor: IActorRef
     public void Fault(AggregateException exception, object message)
     {
         _state = ActorState.Faulty;
-        RunHook(() => _actor.BeforeRestart(exception, message));
+        RunHook(() => Actor.BeforeRestart(exception, message));
     }
 
     /// <summary>
@@ -176,7 +216,7 @@ public class MailboxProcessor: IActorRef
     public void Restart()
     {
         _state = ActorState.Restarting;
-        RunHook(() => _actor.AfterRestart());
+        RunHook(() => Actor.AfterRestart());
         IdleAndCheckForNextMessage();
     }
     
@@ -185,7 +225,7 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     public void Stop()
     {
-        RunHook(() => _actor.BeforeStop());
+        RunHook(() => Actor.BeforeStop());
         Parent?.RemoveChild(Name);
         _state = ActorState.Stopped;
     }

@@ -1,5 +1,5 @@
-﻿using System.Threading;
-using ActorDemo;
+﻿using ActorDemo;
+using ActorDemo.Routing;
 
 var system = new ActorSystem("some name");
 
@@ -13,6 +13,14 @@ system.Tell(initiator, new Ping("hello"));
 // ask an actor for a result (async)
 var result = system.Ask<int>(initiator, new MeaningOfLife()).GetAwaiter().GetResult();
 Console.WriteLine($"Received answer: {result}");
+
+// instantiate a router with 5 routee-actors
+var worker = system
+    .WithRouter(new RoundRobinPool(5))
+    .ActorOf<Worker>("worker");
+
+for (var i=0; i < 10; i++)
+    system.Tell(worker, new Ping("hi worker"));
 
 try
 {
@@ -51,6 +59,15 @@ public class TimeOver
 }
 
 // Example actors -- without state...
+public class Worker : Actor
+{
+    public override Task OnReceiveAsync(object message)
+    {
+        Console.WriteLine($"{Self}: received {message} from {Sender}");
+        return Task.CompletedTask;
+    }
+}
+
 public class Initiator : Actor
 {
     private readonly Timer _timer;

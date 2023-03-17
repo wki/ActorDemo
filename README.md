@@ -5,6 +5,8 @@ A simple experiment with a minimalistic Actor System
  * runs on one process only (no remoting, no cluster)
  * actors only have one state
  * message dispatching in one method only
+ * simple restart strategy
+ * ask capability
  * no built-in timers
  * no built-in forwarding and dispatching logic
 
@@ -13,7 +15,7 @@ A simple experiment with a minimalistic Actor System
 
 ### Build an actor system
 
-````sharp
+````csharp
 // build Actor System 
 var system = new ActorSystem("some name");
 
