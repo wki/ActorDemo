@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Actor System containing all actors

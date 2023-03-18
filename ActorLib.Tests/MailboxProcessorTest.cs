@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace ActorDemo.Tests;
+namespace ActorLib.Tests;
 
 [TestFixture]
 public class MailboxProcessorTest

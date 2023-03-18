@@ -1,4 +1,4 @@
-namespace ActorDemo.Ask;
+namespace ActorLib.Ask;
 
 // ReSharper disable once ClassNeverInstantiated.Global
 

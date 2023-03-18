@@ -1,4 +1,4 @@
-namespace ActorDemo.Ask;
+namespace ActorLib.Ask;
 
 public class AskTimeoutException : Exception
 {

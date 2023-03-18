@@ -1,4 +1,4 @@
-namespace ActorDemo.Routing;
+namespace ActorLib.Routing;
 
 public interface IRoutingStrategy
 {

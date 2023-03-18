@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Reference to an actor to be used as receiver for messages

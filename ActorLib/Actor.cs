@@ -1,7 +1,7 @@
-using ActorDemo.Routing;
-using ActorDemo.Ask;
+using ActorLib.Ask;
+using ActorLib.Routing;
 
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Base Class for every Actor and ActorSystem (contains user code for actor)

@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Helper class for building Routers etc.

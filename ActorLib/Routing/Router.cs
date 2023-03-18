@@ -1,4 +1,4 @@
-namespace ActorDemo.Routing;
+namespace ActorLib.Routing;
 
 /// <summary>
 /// Base class for a router

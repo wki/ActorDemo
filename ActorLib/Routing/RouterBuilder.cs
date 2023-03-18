@@ -1,4 +1,4 @@
-namespace ActorDemo.Routing;
+namespace ActorLib.Routing;
 
 /// <summary>
 /// Builder for creating a router plus child actors according to routing Strategy

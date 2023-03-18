@@ -1,4 +1,4 @@
-namespace ActorDemo.Tests;
+namespace ActorLib.Tests;
 using NUnit.Framework;
 
 [TestFixture]

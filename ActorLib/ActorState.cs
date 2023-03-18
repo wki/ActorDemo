@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 public enum ActorState
 {

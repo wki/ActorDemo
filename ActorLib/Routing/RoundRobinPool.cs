@@ -1,4 +1,4 @@
-namespace ActorDemo.Routing;
+namespace ActorLib.Routing;
 
 /// <summary>
 /// A router with a given number of children handling requests in round-robin fashion

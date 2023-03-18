@@ -17,7 +17,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ActorDemo\ActorDemo.csproj" />
+      <ProjectReference Include="..\ActorLib\ActorLib.csproj" />
     </ItemGroup>
 
 </Project>

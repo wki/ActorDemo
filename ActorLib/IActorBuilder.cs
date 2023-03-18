@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Signature of the ActorOf<T>() method being used at various places

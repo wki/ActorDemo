@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-[assembly: InternalsVisibleTo("ActorDemo.Tests")]
+[assembly: InternalsVisibleTo("ActorLib.Tests")]
 
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Working logic behind Actor and ActorSystem

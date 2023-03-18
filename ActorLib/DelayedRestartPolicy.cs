@@ -1,4 +1,4 @@
-namespace ActorDemo;
+namespace ActorLib;
 
 /// <summary>
 /// Restart an actor after failure up to a given count and wait before restarting
