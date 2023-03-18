@@ -1,3 +1,4 @@
+using ActorWebDemo.Service;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ActorWebDemo.Controllers;
@@ -13,10 +14,12 @@ public class WeatherForecastController : ControllerBase
     };
 
     private readonly ILogger<WeatherForecastController> _logger;
+    private readonly Backend _backend;
 
-    public WeatherForecastController(ILogger<WeatherForecastController> logger)
+    public WeatherForecastController(ILogger<WeatherForecastController> logger, Backend backend)
     {
         _logger = logger;
+        _backend = backend;
     }
 
     [HttpGet(Name = "GetWeatherForecast")]
@@ -29,5 +32,19 @@ public class WeatherForecastController : ControllerBase
                 Summary = Summaries[Random.Shared.Next(Summaries.Length)]
             })
             .ToArray();
+    }
+
+    [HttpGet, Route("dosomething")]
+    public IActionResult Backend()
+    {
+        _backend.DoSomething();
+        return Ok();
+    }
+
+    [HttpGet, Route("echo/{message}")]
+    public async Task<IActionResult> Echo(string message)
+    {
+        var echo = await _backend.Echo(message);
+        return Ok(echo);
     }
 }
