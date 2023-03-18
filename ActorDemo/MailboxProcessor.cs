@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+[assembly: InternalsVisibleTo("ActorDemo.Tests")]
 
 namespace ActorDemo;
 
@@ -6,53 +8,24 @@ namespace ActorDemo;
 /// Working logic behind Actor and ActorSystem
 /// </summary>
 /// <remarks>
+/// hides all implementation details from the Actor containing user code
 /// * handles incoming messages
 /// * handles processing of oldest message
-/// * handles errors during message processing
+/// * handles errors during message processing including restart policy
 /// * handles child-actor creation
+/// * offers a stash
 /// </remarks>
 public class MailboxProcessor: IActorRef
 {
-    // current state of the actor
-    private ActorState _state = ActorState.Initializing;
-    
-    // internal list of Children
-    private readonly Dictionary<string, MailboxProcessor> _children = new Dictionary<string, MailboxProcessor>();
-
-    /// <summary>
-    /// Access all children of this actor
-    /// </summary>
-    public IReadOnlyList<IActorRef> Children => _children.Values.ToList().AsReadOnly();
-    
-    /// <summary>
-    /// This actor's parent (system has null as parent)
-    /// </summary>
-    public MailboxProcessor Parent { get; }
-    
     /// <summary>
     /// Actor's name (unique among siblings)
     /// </summary>
     public string Name { get; }
 
     /// <summary>
-    /// Handles restarting an actor in case of failure possibly with delays
+    /// This actor's parent (system has null as parent)
     /// </summary>
-    private readonly IRestartPolicy _restartPolicy;
-
-    // we are using an unbounded channel as a mailbox
-    private Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
-    
-    // the task which processes our messages
-    private Task _messageLoop;
-    
-    // actor with user-provided message handling code and state
-    public Actor Actor { get; }
-    
-    // stash contains messages to be processed defered when unstashed
-    public readonly Queue<Envelope> _stash = new Queue<Envelope>();
-    
-    // currently processed message
-    private Envelope? _currentlyProcessing = null;
+    public MailboxProcessor Parent { get; }
     
     public MailboxProcessor(string name, MailboxProcessor parent, Actor actor)
     {
@@ -65,7 +38,7 @@ public class MailboxProcessor: IActorRef
         _restartPolicy = new DelayedRestartPolicy();
     }
     
-    #region Actor creation
+    #region Child-Actor creation
     public IActorRef ActorOf<T>(string name, params object[] args)
         where T : Actor => ActorOf(typeof(T), name, args);
     
@@ -80,15 +53,6 @@ public class MailboxProcessor: IActorRef
             name = name.Replace("*", randomPart);
         }
 
-        // take first constructor
-        // var ctor = actorType.GetConstructors().FirstOrDefault();
-        // if (ctor is null)
-        //     throw new InvalidOperationException($"Actor {actorType.Name} has no constructur");
-        //
-        // var actor = ctor.Invoke(args)
-        //     as Actor;
-        
-        // find matching constructor
         var actor = actorType
                 .GetConstructor(args.Select(a => a.GetType()).ToArray())
                 .Invoke(args)
@@ -104,6 +68,23 @@ public class MailboxProcessor: IActorRef
 
     #region Message handling
     /// <summary>
+    /// Handles restarting an actor in case of failure possibly with delays
+    /// </summary>
+    private readonly IRestartPolicy _restartPolicy;
+
+    // we are using an unbounded channel as a mailbox
+    private readonly Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
+    
+    // the task which processes our messages
+    private Task _messageLoop;
+    
+    // actor with user-provided message handling code and state
+    public Actor Actor { get; }
+    
+    // currently processed message
+    private Envelope? _currentlyProcessing = null;
+    
+    /// <summary>
     /// Low level message sending with all parts of an envelope (not recommended)
     /// </summary>
     /// <param name="sender"></param>
@@ -113,7 +94,7 @@ public class MailboxProcessor: IActorRef
         EnqueueMessage(new Envelope(sender, receiver, message));
 
     /// <summary>
-    /// Reploy with a new message to the sender of the current message
+    /// Reply with a new message to the sender of the current message
     /// </summary>
     /// <param name="message"></param>
     public void Reply(object message) =>
@@ -163,6 +144,9 @@ public class MailboxProcessor: IActorRef
     #endregion
 
     #region State handling
+    // current state of the actor
+    private ActorState _state = ActorState.Initializing;
+
     private void RunHook(Action hook)
     {
         try { hook(); }
@@ -211,6 +195,14 @@ public class MailboxProcessor: IActorRef
     #endregion
     
     #region Child handling
+    // internal list of Children for modification (with locking)
+    private readonly Dictionary<string, MailboxProcessor> _children = new Dictionary<string, MailboxProcessor>();
+
+    /// <summary>
+    /// Readonly access all children of this actor
+    /// </summary>
+    public IReadOnlyList<IActorRef> Children => _children.Values.ToList().AsReadOnly();
+    
     public MailboxProcessor GetChild(string name)
     {
         lock (_children)
@@ -241,6 +233,9 @@ public class MailboxProcessor: IActorRef
     #endregion
     
     #region Stash handling
+    // stash contains messages to be processed defered when unstashed
+    internal readonly Queue<Envelope> _stash = new Queue<Envelope>();
+    
     /// <summary>
     /// put the currently processing message to a stash (typically in BeforeRestart hook)
     /// </summary>

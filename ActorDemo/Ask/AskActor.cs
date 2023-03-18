@@ -1,6 +1,11 @@
 namespace ActorDemo.Ask;
 
 // ReSharper disable once ClassNeverInstantiated.Global
+
+/// <summary>
+/// temporary actor sending one message to a receiver waiting for an answer with timeout
+/// </summary>
+/// <typeparam name="T"></typeparam>
 public class AskActor<T>: Actor
 {
     private readonly IActorRef _receiver;

@@ -2,7 +2,7 @@ namespace ActorDemo.Tests;
 using NUnit.Framework;
 
 [TestFixture]
-public class Tests
+public class TaskTest
 {
     [Test]
     [Repeat(1000)]
