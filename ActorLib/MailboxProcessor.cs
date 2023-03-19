@@ -53,10 +53,12 @@ public class MailboxProcessor: IActorRef
             name = name.Replace("*", randomPart);
         }
 
+        var ctors = actorType.GetConstructors();
+        
         var actor = actorType
-                .GetConstructor(args.Select(a => a.GetType()).ToArray())
-                .Invoke(args)
-            as Actor;
+            .GetConstructor(args.Select(a => a.GetType()).ToArray())
+            .Invoke(args)
+                as Actor;
         
         var mailboxProcessor = new MailboxProcessor(name, this, actor);
         actor.Self = mailboxProcessor;
