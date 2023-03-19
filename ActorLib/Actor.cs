@@ -56,6 +56,13 @@ public abstract class Actor : IActorBuilder
         where T : Actor => MyMailboxProcessor.ActorOf<T>(name, args);
 
     /// <summary>
+    /// Returns a known child's reference (null when not known)
+    /// </summary>
+    /// <param name="name">name of the child</param>
+    /// <returns>IActorRef allowing to reference child</returns>
+    public IActorRef GetChild(string name) => MyMailboxProcessor.GetChild(name);
+    
+    /// <summary>
     /// Build a router with some actors in behind being used by some routing strategy
     /// </summary>
     /// <param name="routingStrategy"></param>

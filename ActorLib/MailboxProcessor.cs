@@ -53,11 +53,11 @@ public class MailboxProcessor: IActorRef
             name = name.Replace("*", randomPart);
         }
 
-        var ctors = actorType.GetConstructors();
-        
-        var actor = actorType
+        var ctor = actorType
             .GetConstructor(args.Select(a => a.GetType()).ToArray())
-            .Invoke(args)
+            ?? throw new ArgumentException($"No ctor in class {actorType.Name} found for provided arguments (nrArgs = {args.Length})");
+        
+        var actor = ctor.Invoke(args)
                 as Actor;
         
         var mailboxProcessor = new MailboxProcessor(name, this, actor);

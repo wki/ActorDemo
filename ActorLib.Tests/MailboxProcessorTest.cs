@@ -29,6 +29,12 @@ public class MailboxProcessorTest
         Assert.IsNull(_mailboxProcessor.Parent);
         CollectionAssert.IsEmpty(_mailboxProcessor.Children);
         CollectionAssert.IsEmpty(_mailboxProcessor._stash);
+        
+        CollectionAssert.IsEmpty(_actor.ReceivedMessages);
+        CollectionAssert.AreEquivalent(
+            new []{"AfterStart"},
+            _actor.CalledHooks
+        );
     }
     
     [Test]
@@ -47,8 +53,7 @@ public class MailboxProcessorTest
     public async Task Tell_SendsMessageToReceiver()
     {
         // Arrange
-        var receiver = _actor.ActorOf<TestActor>("receiver");
-        var sender = _actor.ActorOf<SendActor>("sender", receiver);
+        var sender = _actor.ActorOf<SendActor>("sender", _mailboxProcessor);
         await Task.Delay(200);
 
         // Act
@@ -58,7 +63,55 @@ public class MailboxProcessorTest
         // Assert
         CollectionAssert.AreEquivalent(
             new[]{"sender:Ping"},
-            ((TestActor)((MailboxProcessor)receiver).Actor).ReceivedMessages
+            _actor.ReceivedMessages
+        );
+    }
+
+    [Test]
+    public async Task Reply_AnswersMessageBackToSender()
+    {
+        // Arrange
+        var replyer = _actor.ActorOf<SendActor>("replyer", _mailboxProcessor);
+        
+        // Act
+        _actor.Tell(replyer, new Ping());
+        await Task.Delay(200);
+        
+        // Assert
+        CollectionAssert.AreEquivalent(
+            new[]{"replyer:Pong"},
+            _actor.ReceivedMessages
+        );
+    }
+
+    [Test]
+    public async Task Forward_SendsMessageToReceiverWithoutChangingSender()
+    {
+        // Arrange
+        var replyer = _actor.ActorOf<SendActor>("forwarder", _mailboxProcessor);
+        
+        // Act
+        _actor.Tell(replyer, new Something());
+        await Task.Delay(200);
+        
+        // Assert
+        CollectionAssert.AreEquivalent(
+            new[]{"wx-7:Something"},
+            _actor.ReceivedMessages
+        );
+    }
+
+    [Test]
+    public async Task ExceptionDuringProcessing_HandlesError()
+    {
+        // Act
+        _mailboxProcessor.SendMessage(_mailboxProcessor, _mailboxProcessor, "die");
+        await Task.Delay(800); // restartPolicy needs 500ms
+        
+        // Assert
+        CollectionAssert.AreEquivalent(
+            new[]{"AfterStart", "BeforeRestart: ArgumentException", "AfterRestart"},
+            _actor.CalledHooks
         );
     }
     
@@ -105,7 +158,41 @@ public class MailboxProcessorTest
         // Act+Assert
         Assert.Throws<ArgumentException>(() => _actor.ActorOf<TestActor>("foo-bar"));
     }
+
+    [Test]
+    public void GetChild_NoChildren_givesNull()
+    {
+        // Assert
+        Assert.IsNull(_mailboxProcessor.GetChild("foo"));
+    }
+
+    [Test]
+    public void GetChild_unknown_givesNull()
+    {
+        // Arrange
+        var child1 = _actor.ActorOf<TestActor>("child-1");
+        var child2 = _actor.ActorOf<TestActor>("child-2");
+        var child3 = _actor.ActorOf<TestActor>("child-3");
+
+        // Assert
+        Assert.IsNull(_mailboxProcessor.GetChild("foo"));        
+    }
     
+    [Test]
+    public void GetChild_known_givesReference()
+    {
+        // Arrange
+        var child1 = _actor.ActorOf<TestActor>("child-1");
+        var child2 = _actor.ActorOf<TestActor>("child-2");
+        var child3 = _actor.ActorOf<TestActor>("child-3");
+
+        // Act
+        var child = _mailboxProcessor.GetChild("child-2");
+        
+        // Assert
+        Assert.AreSame(child, child2);        
+    }
+
     // stash handling
     
     [Test]
@@ -119,14 +206,23 @@ public class MailboxProcessorTest
 public class TestActor : Actor
 {
     public List<string> ReceivedMessages = new List<string>();
+    public List<string> CalledHooks = new List<string>();
     
     public override Task OnReceiveAsync(object message)
     {
         var sender = Regex.Replace(Sender.ToString(), "^.*'(.+)'$", "$1");
         ReceivedMessages.Add($"{sender}:{message.GetType().Name}");
+
+        if (message == "die")
+            throw new ArgumentException("died just for fun");
         
         return Task.CompletedTask;
     }
+
+    public override void AfterStart() => CalledHooks.Add("AfterStart");
+    public override void BeforeRestart(Exception e, object m) => CalledHooks.Add($"BeforeRestart: {e.GetType().Name}");
+    public override void AfterRestart() => CalledHooks.Add("AfterRestart");
+    public override void BeforeStop() => CalledHooks.Add("AfterStart");
 }
 
 public class SendActor : Actor
@@ -146,27 +242,12 @@ public class SendActor : Actor
                 Tell(_other, new Ping());
                 break;
             
-            default:
-                Forward(_other);
-                break;
-        }
-
-        return Task.CompletedTask;
-    }
-}
-
-public class ReplyActor : Actor
-{
-    public override Task OnReceiveAsync(object message)
-    {
-        switch (message)
-        {
             case Ping:
                 Reply(new Pong());
                 break;
-            
-            case string s:
-                Reply($"answer: {s}");
+
+            default:
+                Forward(_other);
                 break;
         }
 
@@ -177,3 +258,6 @@ public class ReplyActor : Actor
 public record Ping();
 
 public record Pong();
+
+public record Something();
+
