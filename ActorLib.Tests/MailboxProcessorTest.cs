@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using NUnit.Framework;
-using NUnit.Framework.Internal;
 
 namespace ActorLib.Tests;
 
@@ -29,6 +28,12 @@ public class MailboxProcessorTest
         Assert.IsNull(_mailboxProcessor.Parent);
         CollectionAssert.IsEmpty(_mailboxProcessor.Children);
         CollectionAssert.IsEmpty(_mailboxProcessor._stash);
+        
+        Assert.AreSame(_mailboxProcessor, _actor.Self);
+        Assert.AreSame(_mailboxProcessor, _actor.MyMailboxProcessor);
+        Assert.AreEqual(_mailboxProcessor.Name, _actor.Name);
+        Assert.IsNull(_actor.Parent);
+        CollectionAssert.IsEmpty(_actor.Children);
         
         CollectionAssert.IsEmpty(_actor.ReceivedMessages);
         CollectionAssert.AreEquivalent(
@@ -102,6 +107,19 @@ public class MailboxProcessorTest
     }
 
     [Test]
+    public async Task Ask_CreatesTaskWithAnswer()
+    {
+        // Arrange
+        var answerer = _actor.ActorOf<SendActor>("asker", _mailboxProcessor);
+        
+        // Act
+        var answer = await _actor.Ask<Pong>(answerer, new Ping());
+        
+        // Assert
+        Assert.IsInstanceOf<Pong>(answer);
+    }
+
+    [Test]
     public async Task ExceptionDuringProcessing_HandlesError()
     {
         // Act
@@ -111,6 +129,32 @@ public class MailboxProcessorTest
         // Assert
         CollectionAssert.AreEquivalent(
             new[]{"AfterStart", "BeforeRestart: ArgumentException", "AfterRestart"},
+            _actor.CalledHooks
+        );
+        CollectionAssert.AreEquivalent(
+            // Stash/UnStashAll is responsible for double-processing...
+            new[] {"wx-7:String", "wx-7:String"},
+            _actor.ReceivedMessages
+        );
+    }
+
+    [Test]
+    public async Task Exception_endless_terminates_Actor()
+    {
+        // Arrange
+        _mailboxProcessor._restartPolicy = new DelayedRestartPolicy(5, 10);
+        _mailboxProcessor.SendMessage(_mailboxProcessor, _mailboxProcessor, "alwaysdie");
+        await Task.Delay(1000); // restartPolicy needs 5 x 10ms plus ...
+
+        // Assert
+        CollectionAssert.AreEquivalent(
+            new[]{"AfterStart", 
+                "BeforeRestart: ArgumentException", "AfterRestart",
+                "BeforeRestart: ArgumentException", "AfterRestart",
+                "BeforeRestart: ArgumentException", "AfterRestart",
+                "BeforeRestart: ArgumentException", "AfterRestart",
+                "BeforeStop"
+            },
             _actor.CalledHooks
         );
     }
@@ -129,9 +173,13 @@ public class MailboxProcessorTest
             new[]{child1, child2, child3},
             _actor.Children
         );
-        Assert.AreEqual(((MailboxProcessor)child1).Parent, _mailboxProcessor);
-        Assert.AreEqual(((MailboxProcessor)child2).Parent, _mailboxProcessor);
-        Assert.AreEqual(((MailboxProcessor)child3).Parent, _mailboxProcessor);
+        Assert.AreSame(((MailboxProcessor)child1).Parent, _mailboxProcessor);
+        Assert.AreSame(((MailboxProcessor)child2).Parent, _mailboxProcessor);
+        Assert.AreSame(((MailboxProcessor)child3).Parent, _mailboxProcessor);
+        
+        Assert.AreSame(((MailboxProcessor)child1).Actor.Parent, _mailboxProcessor);
+        Assert.AreSame(((MailboxProcessor)child2).Actor.Parent, _mailboxProcessor);
+        Assert.AreSame(((MailboxProcessor)child3).Actor.Parent, _mailboxProcessor);
     }
 
     [Test]
@@ -163,7 +211,7 @@ public class MailboxProcessorTest
     public void GetChild_NoChildren_givesNull()
     {
         // Assert
-        Assert.IsNull(_mailboxProcessor.GetChild("foo"));
+        Assert.IsNull(_actor.GetChild("foo"));
     }
 
     [Test]
@@ -175,7 +223,24 @@ public class MailboxProcessorTest
         var child3 = _actor.ActorOf<TestActor>("child-3");
 
         // Assert
-        Assert.IsNull(_mailboxProcessor.GetChild("foo"));        
+        Assert.IsNull(_actor.GetChild("foo"));        
+    }
+
+    [Test]
+    public void Children_matches_active_child_actors()
+    {
+        // Arrange
+        var child1 = _actor.ActorOf<TestActor>("child-1");
+        var child2 = _actor.ActorOf<TestActor>("child-2");
+        var child3 = _actor.ActorOf<TestActor>("child-3");
+        var child4 = _actor.ActorOf<TestActor>("child-4");
+        _mailboxProcessor.RemoveChild("child-3");
+
+        // Assert
+        CollectionAssert.AreEquivalent(
+            new[] {child1, child2, child4},
+            _mailboxProcessor.Children
+        );
     }
     
     [Test]
@@ -187,7 +252,7 @@ public class MailboxProcessorTest
         var child3 = _actor.ActorOf<TestActor>("child-3");
 
         // Act
-        var child = _mailboxProcessor.GetChild("child-2");
+        var child = _actor.GetChild("child-2");
         
         // Assert
         Assert.AreSame(child, child2);        
@@ -202,62 +267,3 @@ public class MailboxProcessorTest
         Assert.AreEqual("ActorRef 'wx-7'", _mailboxProcessor.ToString());
     }
 }
-
-public class TestActor : Actor
-{
-    public List<string> ReceivedMessages = new List<string>();
-    public List<string> CalledHooks = new List<string>();
-    
-    public override Task OnReceiveAsync(object message)
-    {
-        var sender = Regex.Replace(Sender.ToString(), "^.*'(.+)'$", "$1");
-        ReceivedMessages.Add($"{sender}:{message.GetType().Name}");
-
-        if (message == "die")
-            throw new ArgumentException("died just for fun");
-        
-        return Task.CompletedTask;
-    }
-
-    public override void AfterStart() => CalledHooks.Add("AfterStart");
-    public override void BeforeRestart(Exception e, object m) => CalledHooks.Add($"BeforeRestart: {e.GetType().Name}");
-    public override void AfterRestart() => CalledHooks.Add("AfterRestart");
-    public override void BeforeStop() => CalledHooks.Add("AfterStart");
-}
-
-public class SendActor : Actor
-{
-    private readonly IActorRef _other;
-
-    public SendActor(IActorRef other)
-    {
-        _other = other;
-    }
-    
-    public override Task OnReceiveAsync(object message)
-    {
-        switch (message)
-        {
-            case "tell":
-                Tell(_other, new Ping());
-                break;
-            
-            case Ping:
-                Reply(new Pong());
-                break;
-
-            default:
-                Forward(_other);
-                break;
-        }
-
-        return Task.CompletedTask;
-    }
-}
-
-public record Ping();
-
-public record Pong();
-
-public record Something();
-

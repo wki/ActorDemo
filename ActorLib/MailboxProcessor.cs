@@ -72,7 +72,7 @@ public class MailboxProcessor: IActorRef
     /// <summary>
     /// Handles restarting an actor in case of failure possibly with delays
     /// </summary>
-    private readonly IRestartPolicy _restartPolicy;
+    internal IRestartPolicy _restartPolicy;
 
     // we are using an unbounded channel as a mailbox
     private readonly Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
