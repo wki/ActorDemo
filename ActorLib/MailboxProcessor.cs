@@ -124,23 +124,41 @@ public class MailboxProcessor: IActorRef
             _currentlyProcessing = await _mailbox.Reader.ReadAsync();
             _state = ActorState.Running;
             Actor.Sender = _currentlyProcessing.Sender;
+            var message = _currentlyProcessing.Message;
             try
             {
-                await Actor.OnReceiveAsync(_currentlyProcessing.Message);
+                switch (message)
+                {
+                    case PoisonPill:
+                        Stop();
+                        break;
+                    
+                    case ChildStopped childStopped:
+                        // FIXME: use supervision strategy
+                        RunHook(() => Actor.AfterChildStopped(childStopped.Name));
+                        break;
+                    
+                    default:
+                        await Actor.OnReceiveAsync(message);
+                        break;
+                }
             }
             catch (Exception e)
             {
                 if (await _restartPolicy.CanRestartAsync())
                 {
-                    HandleFault(e, _currentlyProcessing.Message);
+                    HandleFault(e, message);
                     Restart();
                 }
                 else
+                {
                     // Restart Policy forbids a restart.
+                    Stop();
                     break;
+                }
             }
         }
-
+        
         Stop();
     }
     #endregion
@@ -190,9 +208,12 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     public void Stop()
     {
-        RunHook(() => Actor.BeforeStop());
-        Parent?.RemoveChild(Name);
-        _state = ActorState.Stopped;
+        if (_state != ActorState.Stopped)
+        {
+            RunHook(() => Actor.BeforeStop());
+            Parent?.RemoveChild(Name);
+            _state = ActorState.Stopped;
+        }
     }
     #endregion
     
@@ -205,6 +226,11 @@ public class MailboxProcessor: IActorRef
     /// </summary>
     public IReadOnlyList<IActorRef> Children => _children.Values.ToList().AsReadOnly();
     
+    /// <summary>
+    /// Get a child by name
+    /// </summary>
+    /// <param name="name">child to search for</param>
+    /// <returns>Mailbox Processor of child (or null)</returns>
     public MailboxProcessor GetChild(string name)
     {
         lock (_children)
@@ -215,6 +241,12 @@ public class MailboxProcessor: IActorRef
         }
     }
 
+    /// <summary>
+    /// Add a child to the list of children
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="mailboxProcessor"></param>
+    /// <exception cref="ArgumentException"></exception>
     public void AddChild(string name, MailboxProcessor mailboxProcessor)
     {
         lock (_children)
@@ -225,6 +257,10 @@ public class MailboxProcessor: IActorRef
         }
     }
 
+    /// <summary>
+    /// Remove a child from the list of children
+    /// </summary>
+    /// <param name="name"></param>
     public void RemoveChild(string name)
     {
         lock (_children)

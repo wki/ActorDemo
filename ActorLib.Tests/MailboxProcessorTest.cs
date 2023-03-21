@@ -128,7 +128,7 @@ public class MailboxProcessorTest
         
         // Assert
         CollectionAssert.AreEquivalent(
-            new[]{"AfterStart", "BeforeRestart: ArgumentException", "AfterRestart"},
+            new[] {"AfterStart", "BeforeRestart: ArgumentException", "AfterRestart"},
             _actor.CalledHooks
         );
         CollectionAssert.AreEquivalent(

@@ -21,6 +21,11 @@ public class Router: Actor
         _routingStrategy.BuildChildren(MyMailboxProcessor, _actorType, _childArgs);
     }
 
+    public override void AfterChildStopped(string name)
+    {
+        _routingStrategy.BuildChildren(MyMailboxProcessor, _actorType, _childArgs);
+    }
+
     public override Task OnReceiveAsync(object message) =>
         _routingStrategy.OnReceiveAsync(message);
 }

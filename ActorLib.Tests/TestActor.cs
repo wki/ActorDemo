@@ -19,7 +19,6 @@ public class TestActor : Actor
 
         if (message == "alwaysdie")
             throw new ArgumentException("died just for fun");
-
         
         return Task.CompletedTask;
     }

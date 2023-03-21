@@ -74,6 +74,7 @@ public abstract class Actor : IActorBuilder
     public virtual void BeforeStop() {}
     public virtual void BeforeRestart(Exception e, object message) {}
     public virtual void AfterRestart() {}
+    public virtual void AfterChildStopped(string name) {}
 
     /// <summary>
     /// must be implemented to handle a single message async

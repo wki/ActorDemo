@@ -19,7 +19,7 @@ public class RoundRobinPool: IRoutingStrategy
     {
         _router = (MailboxProcessor) router;
         var name = $"{_router.Name}-*";
-        for (var i = 1; i <= _nrChildren; i++)
+        while (_router.Children.Count < _nrChildren)
             _router.ActorOf(actorType, name, childArgs);
     }
 
