@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorConsoleDemo", "ActorCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorWebDemo", "ActorWebDemo\ActorWebDemo.csproj", "{CFA60B26-7C7C-4EB4-9C15-9FE0E78B87B9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventStore", "EventStore\EventStore.csproj", "{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,5 +37,9 @@ Global
 		{CFA60B26-7C7C-4EB4-9C15-9FE0E78B87B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CFA60B26-7C7C-4EB4-9C15-9FE0E78B87B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CFA60B26-7C7C-4EB4-9C15-9FE0E78B87B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

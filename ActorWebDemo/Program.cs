@@ -1,4 +1,5 @@
 using ActorWebDemo.Service;
+using EventStore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddSingleton<IEventRepository>(provider => new EventRepository("Data Source = ./repository.db"));
 builder.Services.AddSingleton<Backend>();
 builder.Services.AddHostedService<Backend>(provider => 
     provider.GetService<Backend>()

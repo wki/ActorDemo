@@ -13,6 +13,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\ActorLib\ActorLib.csproj" />
+      <ProjectReference Include="..\EventStore\EventStore.csproj" />
     </ItemGroup>
 
 </Project>
