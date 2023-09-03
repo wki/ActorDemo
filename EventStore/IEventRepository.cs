@@ -2,6 +2,6 @@ namespace EventStore;
 
 public interface IEventRepository
 {
-    void Append(int aggregateId, int version, IEvent @event);
-    IList<IEvent> Load(int aggregateId);
+    Task AppendAsync(int aggregateId, int version, IEvent @event);
+    Task<IList<IEvent>> LoadAsync(int aggregateId);
 }

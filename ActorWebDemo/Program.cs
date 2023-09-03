@@ -10,7 +10,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<IEventRepository>(provider => new EventRepository("Data Source = ./repository.db"));
+builder.Services.AddSingleton<IEventRepository>(provider => 
+    new EventRepository(
+        connectionString: "Data Source = ./repository.db",
+        assemblyContainingEvents: typeof(EventRepository).Assembly)
+);
 builder.Services.AddSingleton<Backend>();
 builder.Services.AddHostedService<Backend>(provider => 
     provider.GetService<Backend>()

@@ -3,7 +3,6 @@ namespace ActorLib;
 /// <summary>
 /// Actor System containing all actors
 /// </summary>
-/// <param name="message"></param>
 public class ActorSystem: Actor
 {
     public ActorSystem(string name)

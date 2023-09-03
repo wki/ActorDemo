@@ -20,16 +20,17 @@ public class EventRepository: IEventRepository
             .ToDictionary(keySelector: t => t.Name);
     }
 
-    private SqliteConnection OpenConnectionAsync()
+    private async Task<SqliteConnection> OpenConnectionAsync()
     {
         var connection = new SqliteConnection(_connectionString); 
-        connection.Open();
+        await connection.OpenAsync();
         return connection;
     }
     
-    private void CreateDatabaseIfNotExists(SqliteConnection connection)
+    private async Task CreateDatabaseIfNotExistsAsync(SqliteConnection connection)
     {
         if (_databaseCreated) return;
+        
         var command = connection.CreateCommand();
         command.CommandText = @"
             CREATE TABLE IF NOT EXISTS event (
@@ -39,14 +40,15 @@ public class EventRepository: IEventRepository
                 type TEXT,
                 payload TEXT)
             ";
-        command.ExecuteNonQuery();
+        await command.ExecuteNonQueryAsync();
+        
         _databaseCreated = true;
     }
 
-    public void Append(int aggregateId, int version, IEvent @event)
+    public async Task AppendAsync(int aggregateId, int version, IEvent @event)
     { 
-        using var connection = OpenConnectionAsync();
-        CreateDatabaseIfNotExists(connection);
+        await using var connection = await OpenConnectionAsync();
+        await CreateDatabaseIfNotExistsAsync(connection);
         var command = connection.CreateCommand();
         command.CommandText = @"
             INSERT INTO event (aggregate_id, version, occured_on, type, payload)
@@ -57,13 +59,13 @@ public class EventRepository: IEventRepository
         command.Parameters.AddWithValue("$occuredOn", DateTime.Now.Ticks);
         command.Parameters.AddWithValue("$type", @event.GetType().Name);
         command.Parameters.AddWithValue("$payload", JsonConvert.SerializeObject(@event));
-        command.ExecuteNonQueryAsync();
+        await command.ExecuteNonQueryAsync();
     }
 
-    public IList<IEvent> Load(int aggregateId)
+    public async Task<IList<IEvent>> LoadAsync(int aggregateId)
     {
-        using var connection = OpenConnectionAsync();
-        CreateDatabaseIfNotExists(connection);
+        await using var connection = await OpenConnectionAsync();
+        await CreateDatabaseIfNotExistsAsync(connection);
         var command = connection.CreateCommand();
         command.CommandText = $@"
             SELECT type, payload 
@@ -71,7 +73,7 @@ public class EventRepository: IEventRepository
             WHERE aggregate_id = '{aggregateId}'
             ORDER BY version
             ";
-        using var reader = command.ExecuteReader();
+        await using var reader = await command.ExecuteReaderAsync();
         var result = new List<IEvent>();
         while (reader.Read())
         {

@@ -15,7 +15,7 @@ public class EventsController : ControllerBase
     }
     
     [HttpGet, Route("{aggregateId}")]
-    public async Task<IList<IEvent>> Events([FromRoute] Guid aggregateId)
+    public async Task<IList<IEvent>> Events([FromRoute] int aggregateId)
     {
         var result = await _eventRepository.LoadAsync(aggregateId);
 

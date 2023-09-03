@@ -93,7 +93,7 @@ public class MailboxProcessor: IActorRef
     /// <param name="receiver"></param>
     /// <param name="message"></param>
     public void SendMessage(IActorRef sender, IActorRef receiver, object message) =>
-        EnqueueMessage(new Envelope(sender, receiver, message));
+        EnqueueEnvelope(new Envelope(sender, receiver, message));
 
     /// <summary>
     /// Reply with a new message to the sender of the current message
@@ -110,7 +110,7 @@ public class MailboxProcessor: IActorRef
         receiver.SendMessage(_currentlyProcessing.Sender, receiver, _currentlyProcessing.Message);
 
     // low level handling of an envelope
-    private void EnqueueMessage(Envelope envelope)
+    private void EnqueueEnvelope(Envelope envelope)
     {
         if (!_mailbox.Writer.TryWrite(envelope))
             Console.WriteLine($"{this}: could not enqueue Message");
@@ -292,7 +292,7 @@ public class MailboxProcessor: IActorRef
     public void UnStashAll()
     {
         while (_stash.Any())
-            EnqueueMessage(_stash.Dequeue());
+            EnqueueEnvelope(_stash.Dequeue());
     }
     #endregion
     

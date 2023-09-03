@@ -1,17 +1,20 @@
-﻿using ActorLib;
-using ActorLib.Routing;
+﻿using System.Threading.Channels;
+using ActorSimpleLib;
+using ActorSimpleLib.Routing;
 
+Console.WriteLine("ConsoleDemo");
 var system = new ActorSystem("some name");
 
 var receiver = system.ActorOf<Receiver>("receiver");
-var initiator = system.ActorOf<Initiator>("sender", receiver);
+var initiator = system.ActorOf<Initiator>("initiator", receiver);
 
 // send a message to initiator. Origin === system.
 // replies to here would be a dead letter...
 system.Tell(initiator, new Ping("hello"));
+// await Task.Delay(TimeSpan.FromSeconds(10));
 
 // ask an actor for a result (async)
-var result = system.Ask<int>(initiator, new MeaningOfLife()).GetAwaiter().GetResult();
+var result = await system.Ask<int>(initiator, new MeaningOfLife());
 Console.WriteLine($"Received answer: {result}");
 
 // instantiate a router with 5 routee-actors
@@ -19,12 +22,14 @@ var worker = system
     .WithRouter(new RoundRobinPool(5))
     .ActorOf<Worker>("worker");
 
+Console.WriteLine($"Worker = {worker} ({worker.GetType().Name})");
+
 for (var i=0; i < 10; i++)
     system.Tell(worker, new Ping("hi worker"));
 
 try
 {
-    var result2 = system.Ask<int>(initiator, 42).GetAwaiter().GetResult();
+    var result2 = await system.Ask<int>(initiator, 42);
     Console.WriteLine($"Received answer2: {result2} -- should not occur");
 }
 catch (Exception e)
@@ -33,7 +38,7 @@ catch (Exception e)
 }
 
 // do something to keep actorsystem alive...
-Thread.Sleep(TimeSpan.FromSeconds(30));
+await Task.Delay(TimeSpan.FromSeconds(30));
 
 // -----------------
 
@@ -46,22 +51,14 @@ public record MeaningOfLife();
 
 public record StopTimer();
 
-public class TimeOver
-{
-    public int Count { get; set; }
-    public string Message { get; set; }
-
-    public TimeOver(int count, string message)
-    {
-        Count = count;
-        Message = message;
-    }
-}
+public record TimeOver(int Count, string Message);
 
 // Example actors -- without state...
 public class Worker : Actor
 {
-    public override Task OnReceiveAsync(object message)
+    public Worker(IActorRef parent, string name) : base(parent, name) { }
+
+    protected override Task OnReceiveAsync(object message)
     {
         Console.WriteLine($"{Self}: received {message} from {Sender}");
         return Task.CompletedTask;
@@ -74,7 +71,7 @@ public class Initiator : Actor
     private readonly IActorRef _receiver;
     private readonly TimeOver _state;
 
-    public Initiator(IActorRef receiver)
+    public Initiator(IActorRef parent, string name, IActorRef receiver): base(parent, name)
     {
         _receiver = receiver;
         _state = new TimeOver(0, "time over");
@@ -84,11 +81,12 @@ public class Initiator : Actor
     private void TimerElapsed(object o)
     {
         var state = (TimeOver)o;
-        Tell(_receiver, state);
-        state.Count++;
-    }
         
-    public override Task OnReceiveAsync(object message)
+        Tell(_receiver, state);
+        state = new TimeOver(state.Count + 1, state.Message);
+    }
+
+    protected override Task OnReceiveAsync(object message)
     {
         switch (message)
         {
@@ -112,23 +110,25 @@ public class Initiator : Actor
 
 public class Receiver : Actor
 {
-    public Receiver() { }
+    public Receiver(IActorRef parent, string name): base(parent, name) { }
 
-    public override Task OnReceiveAsync(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         switch (message)
         {
             case Pong pong:
                 Console.WriteLine($"{Self} Pong received: {pong}");
-                return Task.CompletedTask;
+                break;
             case TimeOver timeOver:
                 Console.WriteLine($"{Self} TimeOver received: {timeOver.Count}-{timeOver.Message}");
                 if (timeOver.Count >= 3)
                     Tell(Sender, new StopTimer());
-                return Task.CompletedTask;
+                break;
+            default:
+                Console.WriteLine($"{Self}: unhandled Message: {message}");
+                break;
         }
 
-        Console.WriteLine($"{Self}: unhandled Message: {message}");
         return Task.CompletedTask;
     }
 }
