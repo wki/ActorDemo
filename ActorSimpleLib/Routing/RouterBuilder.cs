@@ -11,6 +11,6 @@ public class RouterBuilder
         _routingStrategy = routingStrategy;
     }
 
-    public IActorRef ActorOf<T>(string name, params object[] childArgs) where T : Actor => 
+    public Actor ActorOf<T>(string name, params object[] childArgs) where T : Actor => 
         _parent.ActorOf<Router>(name, _routingStrategy, typeof(T), childArgs);
 }

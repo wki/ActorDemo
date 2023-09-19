@@ -56,7 +56,7 @@ public record TimeOver(int Count, string Message);
 // Example actors -- without state...
 public class Worker : Actor
 {
-    public Worker(IActorRef parent, string name) : base(parent, name) { }
+    public Worker(Actor parent, string name) : base(parent, name) { }
 
     protected override Task OnReceiveAsync(object message)
     {
@@ -68,10 +68,10 @@ public class Worker : Actor
 public class Initiator : Actor
 {
     private readonly Timer _timer;
-    private readonly IActorRef _receiver;
+    private readonly Actor _receiver;
     private readonly TimeOver _state;
 
-    public Initiator(IActorRef parent, string name, IActorRef receiver): base(parent, name)
+    public Initiator(Actor parent, string name, Actor receiver): base(parent, name)
     {
         _receiver = receiver;
         _state = new TimeOver(0, "time over");
@@ -110,7 +110,7 @@ public class Initiator : Actor
 
 public class Receiver : Actor
 {
-    public Receiver(IActorRef parent, string name): base(parent, name) { }
+    public Receiver(Actor parent, string name): base(parent, name) { }
 
     protected override Task OnReceiveAsync(object message)
     {

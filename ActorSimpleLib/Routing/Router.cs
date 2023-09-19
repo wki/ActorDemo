@@ -4,7 +4,7 @@ public class Router: Actor
 {
     private readonly IRoutingStrategy _routingStrategy;
     
-    public Router(IActorRef parent, string name, IRoutingStrategy routingStrategy, Type childType, object[] childArgs) 
+    public Router(Actor parent, string name, IRoutingStrategy routingStrategy, Type childType, object[] childArgs) 
         : base(parent, name)
     {
         _routingStrategy = routingStrategy;

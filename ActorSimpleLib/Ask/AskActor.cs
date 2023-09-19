@@ -2,14 +2,14 @@ namespace ActorSimpleLib;
 
 public class AskActor<T>: Actor
 {
-    private readonly IActorRef _receiver;
+    private readonly Actor _receiver;
     private readonly object _question;
     private readonly TaskCompletionSource<T> _taskCompletionSource;
     private readonly int _timeoutMillis;
     private readonly Timer _timer;
     private bool _answered;
 
-    public AskActor(IActorRef parent, string name, IActorRef receiver, object question, TaskCompletionSource<T> taskCompletionSource, int timeoutMillis)
+    public AskActor(Actor parent, string name, Actor receiver, object question, TaskCompletionSource<T> taskCompletionSource, int timeoutMillis)
         :base(parent, name)
     {
         _receiver = receiver;

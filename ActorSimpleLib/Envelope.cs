@@ -1,3 +1,3 @@
 namespace ActorSimpleLib;
 
-public record Envelope(IActorRef Sender, IActorRef Receiver, object Message);
+public record Envelope(Actor Sender, Actor Receiver, object Message);

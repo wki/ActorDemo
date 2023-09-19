@@ -20,7 +20,7 @@ public class RoundRobinPool: IRoutingStrategy
             _router.ActorOf(name, childType, childArgs);
     }
 
-    public IActorRef ChildToForwardTo()
+    public Actor ChildToForwardTo()
     {
         _childIndex = (_childIndex + 1) % _nrChildren;
         return _router.Children[_childIndex];

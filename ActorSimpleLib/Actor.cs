@@ -4,14 +4,14 @@ using ActorSimpleLib.Routing;
 
 namespace ActorSimpleLib;
 
-public abstract class Actor: IActorRef
+public abstract class Actor
 {
     public string Name { get; }
-    protected IActorRef Parent { get; private set; }
-    protected IActorRef Self => this;
-    protected internal IReadOnlyList<IActorRef> Children =>
+    protected Actor Parent { get; private set; }
+    protected Actor Self => this;
+    protected internal IReadOnlyList<Actor> Children =>
         _children.Values.ToList().AsReadOnly();
-    protected IActorRef Sender { get; private set; }
+    protected Actor Sender { get; private set; }
 
     private readonly ConcurrentDictionary<string, Actor> _children;
     private readonly Channel<Envelope> _mailbox;
@@ -20,7 +20,7 @@ public abstract class Actor: IActorRef
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly IRestartPolicy _restartPolicy;
 
-    protected Actor(IActorRef parent, string name)
+    protected Actor(Actor parent, string name)
     {
         Parent = parent;
         Name = name;
@@ -36,23 +36,23 @@ public abstract class Actor: IActorRef
     #region Message Processing
     protected abstract Task OnReceiveAsync(object message);
 
-    public void Tell(IActorRef receiver, object message) =>
+    public void Tell(Actor receiver, object message) =>
         EnqueueEnvelope(this, receiver, message);
 
     protected void Reply(object message) =>
         EnqueueEnvelope(this, Sender, message);
 
-    protected void Forward(IActorRef receiver) =>
+    protected void Forward(Actor receiver) =>
         EnqueueEnvelope(Sender, receiver, _currentlyProcessing.Message);
 
-    public Task<T> Ask<T>(IActorRef receiver, object message, int timeOutMillis = 500)
+    public Task<T> Ask<T>(Actor receiver, object message, int timeOutMillis = 500)
     {
         var answer = new TaskCompletionSource<T>();
         var askActor = ActorOf<AskActor<T>>("ask-*", receiver, message, answer, timeOutMillis);
         return answer.Task;
     }
     
-    private void EnqueueEnvelope(IActorRef sender, IActorRef receiver, object message) =>
+    private void EnqueueEnvelope(Actor sender, Actor receiver, object message) =>
         EnqueueEnvelope(new Envelope(sender, receiver, message));
     
     private void EnqueueEnvelope(Envelope envelope)
@@ -81,6 +81,7 @@ public abstract class Actor: IActorRef
                 message: new ChildTerminated(Name)
             );
         }
+        _messageProcessingTask.Dispose();
     }
     
     // process messages until an error occurs or the actor is stopped
@@ -143,10 +144,10 @@ public abstract class Actor: IActorRef
     #endregion
     
     #region Child-Actor creation
-    public IActorRef ActorOf<T>(string name, params object[] args) where T : Actor => 
+    public Actor ActorOf<T>(string name, params object[] args) where T : Actor => 
         ActorOf(name, typeof(T), args);
     
-    internal IActorRef ActorOf(string name, Type actorType, params object[] args)
+    internal Actor ActorOf(string name, Type actorType, params object[] args)
     {
         // build names with random part if they contain a "*"
         if (name.Contains('*'))
@@ -174,7 +175,7 @@ public abstract class Actor: IActorRef
     #endregion
 
     #region Child management
-    public IActorRef GetChild(string name) =>
+    public Actor GetChild(string name) =>
         _children.ContainsKey(name)
             ? _children[name]
             : NullActor.Instance;
@@ -192,5 +193,5 @@ public abstract class Actor: IActorRef
     public RouterBuilder WithRouter(IRoutingStrategy routingStrategy) =>
         new RouterBuilder(this, routingStrategy);
     
-    public override string ToString() => $"ActorRef '{Name}'";
+    public override string ToString() => $"Actor '{Name}'";
 }
