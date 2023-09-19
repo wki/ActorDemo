@@ -8,9 +8,9 @@ namespace ActorSimpleLib;
 /// </remarks>
 public class NullActor : Actor
 {
-    public static readonly NullActor Instance = new NullActor(null, "NullActor");
+    public static NullActor Instance = new NullActor();
 
-    private NullActor(IActorRef parent, string name) : base(parent, name) {}
+    private NullActor(): base(null, "NullActor") {}
 
     protected override Task OnReceiveAsync(object message) =>
         Task.CompletedTask;

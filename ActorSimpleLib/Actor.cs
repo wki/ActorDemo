@@ -6,17 +6,19 @@ namespace ActorSimpleLib;
 
 public abstract class Actor: IActorRef
 {
-    public string Name { get; private set; }
-    internal IActorRef Parent { get; private set; }
+    public string Name { get; }
+    protected IActorRef Parent { get; private set; }
     protected IActorRef Self => this;
-    private readonly ConcurrentDictionary<string, Actor> _children;
-    internal IReadOnlyList<IActorRef> Children => _children.Values.ToList().AsReadOnly();
+    protected internal IReadOnlyList<IActorRef> Children =>
+        _children.Values.ToList().AsReadOnly();
     protected IActorRef Sender { get; private set; }
+
+    private readonly ConcurrentDictionary<string, Actor> _children;
     private readonly Channel<Envelope> _mailbox;
     private Envelope? _currentlyProcessing;
     private Task _messageProcessingTask;
-    private CancellationTokenSource _cancellationTokenSource;
-    private IRestartPolicy _restartPolicy;
+    private readonly CancellationTokenSource _cancellationTokenSource;
+    private readonly IRestartPolicy _restartPolicy;
 
     protected Actor(IActorRef parent, string name)
     {
@@ -40,7 +42,7 @@ public abstract class Actor: IActorRef
     protected void Reply(object message) =>
         EnqueueEnvelope(this, Sender, message);
 
-    protected internal void Forward(IActorRef receiver) =>
+    protected void Forward(IActorRef receiver) =>
         EnqueueEnvelope(Sender, receiver, _currentlyProcessing.Message);
 
     public Task<T> Ask<T>(IActorRef receiver, object message, int timeOutMillis = 500)
@@ -63,14 +65,14 @@ public abstract class Actor: IActorRef
     // process all messages in the entire life of the actor
     private async Task RunMessageLoopAsync()
     {
-        bool isRestart = false;
-        bool shouldStop = false;
-        while (!shouldStop)
-        {
-            shouldStop = await ProcessMessages(isRestart);
-            isRestart = true;
-        }
-        
+        while (await ProcessMessages())
+            // ReSharper disable once ConvertClosureToMethodGroup
+            RunHook(() => AfterRestart());
+
+        // ReSharper disable once ConvertClosureToMethodGroup
+        RunHook(() => BeforeStop());
+        ((Actor) Parent)?.RemoveChild(Name);
+
         if (Parent is not null)
         {
             this.EnqueueEnvelope(
@@ -82,37 +84,24 @@ public abstract class Actor: IActorRef
     }
     
     // process messages until an error occurs or the actor is stopped
-    private async Task<bool> ProcessMessages(bool isRestart)
+    // returns true if actor can restart
+    private async Task<bool> ProcessMessages()
     {
-        if (isRestart)
-            // ReSharper disable once ConvertClosureToMethodGroup
-            RunHook(() => AfterRestart());
-
         try
         {
             await MessageLoopAsync();
         }
         catch (TaskCanceledException e)
         {
-            // ReSharper disable once ConvertClosureToMethodGroup
-            RunHook(() => BeforeStop());
-            ((Actor) Parent)?.RemoveChild(Name);
-            return true;
+            return false;
         }
         catch (Exception e)
         {
             RunHook(() => OnError(e, _currentlyProcessing.Message));
             
-            var canRestart = await _restartPolicy.CanRestartAsync();
-            if (!canRestart)
-            {
-                // ReSharper disable once ConvertClosureToMethodGroup
-                RunHook(() => BeforeStop());
-                ((Actor) Parent)?.RemoveChild(Name);
-                return true;
-            }
+            return await _restartPolicy.CanRestartAsync();
         }
-        return false;
+        return true;
     }
     
     // process messages until an exception is thrown
@@ -124,6 +113,7 @@ public abstract class Actor: IActorRef
             {
                 Sender = NullActor.Instance;
                 _currentlyProcessing = null;
+                
                 _currentlyProcessing = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
                 Sender = _currentlyProcessing.Sender;
                 
@@ -197,7 +187,6 @@ public abstract class Actor: IActorRef
 
     private void RemoveChild(string name) => 
         _children.Remove(name, out Actor value);
-
     #endregion
 
     public RouterBuilder WithRouter(IRoutingStrategy routingStrategy) =>
