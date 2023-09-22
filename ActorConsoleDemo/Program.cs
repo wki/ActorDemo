@@ -1,5 +1,4 @@
-﻿using System.Threading.Channels;
-using ActorSimpleLib;
+﻿using ActorSimpleLib;
 using ActorSimpleLib.Routing;
 
 Console.WriteLine("ConsoleDemo");

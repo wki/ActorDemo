@@ -27,9 +27,9 @@ public class AskActor<T>: Actor
         if (_answered) return;
         
         _taskCompletionSource.TrySetException(new AskTimeoutException($"no answer from {_receiver} on {_question} within {_timeoutMillis:0}ms")); 
-        // _timer.Dispose();
+        _timer.Dispose();
         _answered = true;
-        // Stop();
+        Stop();
     }
     
     protected override Task OnReceiveAsync(object message)
@@ -40,9 +40,9 @@ public class AskActor<T>: Actor
         if (message is T answer)
         {
             _taskCompletionSource.TrySetResult(answer);
-            // _timer.Dispose();
+            _timer.Dispose();
             _answered = true;
-            // Stop();
+            Stop();
         }
 
         return Task.CompletedTask;

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Threading.Channels;
+using ActorSimpleLib.Restart;
 using ActorSimpleLib.Routing;
 
 namespace ActorSimpleLib;
@@ -16,9 +17,9 @@ public abstract class Actor
     private readonly ConcurrentDictionary<string, Actor> _children;
     private readonly Channel<Envelope> _mailbox;
     private Envelope? _currentlyProcessing;
-    private Task _messageProcessingTask;
     private readonly CancellationTokenSource _cancellationTokenSource;
     private readonly IRestartPolicy _restartPolicy;
+    private readonly Task _messageProcessingTask;
 
     protected Actor(Actor parent, string name)
     {
@@ -45,10 +46,10 @@ public abstract class Actor
     protected void Forward(Actor receiver) =>
         EnqueueEnvelope(Sender, receiver, _currentlyProcessing.Message);
 
-    public Task<T> Ask<T>(Actor receiver, object message, int timeOutMillis = 500)
+    public Task<T> Ask<T>(Actor receiver, object question, int timeOutMillis = 500)
     {
         var answer = new TaskCompletionSource<T>();
-        var askActor = ActorOf<AskActor<T>>("ask-*", receiver, message, answer, timeOutMillis);
+        var askActor = ActorOf<AskActor<T>>("ask-*", receiver, question, answer, timeOutMillis);
         return answer.Task;
     }
     
@@ -58,7 +59,7 @@ public abstract class Actor
     private void EnqueueEnvelope(Envelope envelope)
     {
         // FIXME: exception when write fails?
-        if (!((Actor)envelope.Receiver)._mailbox.Writer.TryWrite(envelope))
+        if (!envelope.Receiver._mailbox.Writer.TryWrite(envelope))
             Console.WriteLine($"{this}: could not enqueue Message");
     }
 
@@ -71,11 +72,11 @@ public abstract class Actor
 
         // ReSharper disable once ConvertClosureToMethodGroup
         RunHook(() => BeforeStop());
-        ((Actor) Parent)?.RemoveChild(Name);
+        Parent?.RemoveChild(Name);
 
         if (Parent is not null)
         {
-            this.EnqueueEnvelope(
+            EnqueueEnvelope(
                 sender: NullActor.Instance,
                 receiver: Parent,
                 message: new ChildTerminated(Name)
@@ -88,25 +89,17 @@ public abstract class Actor
     // returns true if actor can restart
     private async Task<bool> ProcessMessages()
     {
-        try
-        {
-            await MessageLoopAsync();
-        }
-        catch (TaskCanceledException e)
-        {
+        var exception = await ProcessUntilExceptionAsync();
+        if (exception is TaskCanceledException)
             return false;
-        }
-        catch (Exception e)
-        {
-            RunHook(() => OnError(e, _currentlyProcessing.Message));
+
+        RunHook(() => OnError(exception, _currentlyProcessing.Message));
             
-            return await _restartPolicy.CanRestartAsync();
-        }
-        return true;
+        return await _restartPolicy.CanRestartAsync();
     }
     
     // process messages until an exception is thrown
-    private async Task<Exception> MessageLoopAsync() 
+    private async Task<Exception> ProcessUntilExceptionAsync() 
     {
         try
         {
@@ -115,6 +108,7 @@ public abstract class Actor
                 Sender = NullActor.Instance;
                 _currentlyProcessing = null;
                 
+                // could throw CanceledException if Actor stopped
                 _currentlyProcessing = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
                 Sender = _currentlyProcessing.Sender;
                 
