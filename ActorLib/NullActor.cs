@@ -1,4 +1,4 @@
-namespace ActorSimpleLib;
+namespace ActorLib;
 
 /// <summary>
 /// A valid actor instead of null

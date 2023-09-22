@@ -1,4 +1,4 @@
-namespace ActorSimpleLib.Restart;
+namespace ActorLib.Restart;
 
 public class DelayedRestartPolicy : IRestartPolicy
 {

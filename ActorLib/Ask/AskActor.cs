@@ -1,4 +1,4 @@
-namespace ActorSimpleLib;
+namespace ActorLib;
 
 public class AskActor<T>: Actor
 {

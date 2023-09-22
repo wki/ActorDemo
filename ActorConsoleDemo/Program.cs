@@ -1,5 +1,6 @@
-﻿using ActorSimpleLib;
-using ActorSimpleLib.Routing;
+﻿using System.Diagnostics;
+using ActorLib;
+using ActorLib.Routing;
 
 Console.WriteLine("ConsoleDemo");
 var system = new ActorSystem("some name");
@@ -36,6 +37,10 @@ catch (Exception e)
     Console.WriteLine(e);
 }
 
+
+var pingCounter = system.ActorOf<PingCounter>("pingcounter");
+var benchmark = system.ActorOf<Benchmark>("benchmark", pingCounter);
+
 // do something to keep actorsystem alive...
 await Task.Delay(TimeSpan.FromSeconds(30));
 
@@ -57,10 +62,9 @@ public class Worker : Actor
 {
     public Worker(Actor parent, string name) : base(parent, name) { }
 
-    protected override Task OnReceiveAsync(object message)
+    protected override void OnReceive(object message)
     {
-        Console.WriteLine($"{Self}: received {message} from {Sender}");
-        return Task.CompletedTask;
+        Console.WriteLine($"{Self.ActorPath}: received {message} from {Sender}");
     }
 }
 
@@ -85,25 +89,26 @@ public class Initiator : Actor
         state = new TimeOver(state.Count + 1, state.Message);
     }
 
-    protected override Task OnReceiveAsync(object message)
+    protected override void OnReceive(object message)
     {
         switch (message)
         {
             case Ping ping:
                 Console.WriteLine($"{Self} Ping received: {ping}");
                 Tell(_receiver, new Pong("also hi"));
-                return Task.CompletedTask;
+                break;
             case StopTimer:
                 Console.WriteLine($"{Self} StopTimer received");
-                return _timer.DisposeAsync().AsTask();
+                _timer.Dispose();
+                break;
             case MeaningOfLife:
                 Console.WriteLine($"{Self} MeaningOfLife received, sender: {Sender}");
                 Reply(42);
-                return Task.CompletedTask;
+                break;
+            default:
+                Console.WriteLine($"{Self}: unhandled Message: {message}, sender: {Sender}");
+                break;                    
         }
-
-        Console.WriteLine($"{Self}: unhandled Message: {message}, sender: {Sender}");
-        return Task.CompletedTask;
     }
 }
 
@@ -111,7 +116,7 @@ public class Receiver : Actor
 {
     public Receiver(Actor parent, string name): base(parent, name) { }
 
-    protected override Task OnReceiveAsync(object message)
+    protected override void OnReceive(object message)
     {
         switch (message)
         {
@@ -127,7 +132,54 @@ public class Receiver : Actor
                 Console.WriteLine($"{Self}: unhandled Message: {message}");
                 break;
         }
+    }
+}
 
-        return Task.CompletedTask;
+public class PingCounter : Actor
+{
+    private int _pingCounter;
+
+    public PingCounter(Actor parent, string name) : base(parent, name)
+    {
+        _pingCounter = 0;
+    }
+
+    protected override void OnReceive(object message)
+    {
+        if (message is Ping ping)
+        {
+            if (++_pingCounter == 1_000_000)
+            {
+                Console.WriteLine("received 1.000.000 pings");
+                Reply(new Pong(_pingCounter.ToString(("0"))));
+            }
+        }
+    }
+}
+
+public class Benchmark : Actor
+{
+    private Stopwatch _stopwatch;
+    
+    public Benchmark(Actor parent, string name, Actor pingCounter): base(parent, name)
+    {
+        Console.WriteLine("Benchmarking...");
+        _stopwatch = new Stopwatch();
+        _stopwatch.Start();
+        Task.Run(() =>
+        {
+            var ping = new Ping("hi");
+            for (var i = 0; i < 1_000_000; i++)
+                Tell(pingCounter, ping);
+        });
+    }
+
+    protected override void OnReceive(object message)
+    {
+        if (message is Pong pong)
+        {
+            _stopwatch.Stop();
+            Console.WriteLine($"Received {pong} after {_stopwatch.ElapsedMilliseconds:0}ms");
+        }
     }
 }

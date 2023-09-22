@@ -1,9 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using System.Threading.Channels;
-using ActorSimpleLib.Restart;
-using ActorSimpleLib.Routing;
+using ActorLib.Restart;
+using ActorLib.Routing;
 
-namespace ActorSimpleLib;
+// ReSharper disable ConvertClosureToMethodGroup
+
+namespace ActorLib;
 
 public abstract class Actor
 {
@@ -13,6 +15,8 @@ public abstract class Actor
     protected internal IReadOnlyList<Actor> Children =>
         _children.Values.ToList().AsReadOnly();
     protected Actor Sender { get; private set; }
+    
+    public ActorStatus ActorStatus { get; private set; }
 
     private readonly ConcurrentDictionary<string, Actor> _children;
     private readonly Channel<Envelope> _mailbox;
@@ -26,6 +30,7 @@ public abstract class Actor
         Parent = parent;
         Name = name;
         Sender = NullActor.Instance;
+        ActorStatus = ActorStatus.Initializing;
 
         _children = new ConcurrentDictionary<string, Actor>();
         _mailbox = Channel.CreateUnbounded<Envelope>();
@@ -33,9 +38,23 @@ public abstract class Actor
         _restartPolicy = new DelayedRestartPolicy();
         _messageProcessingTask = RunMessageLoopAsync();
     }
+
+    public string ActorPath => String.Join('/', GetPath());
+
+    private IEnumerable<String> GetPath() =>
+        Parent is null
+            ? new[] { Name }
+            : Parent.GetPath().Append(Name);
     
     #region Message Processing
-    protected abstract Task OnReceiveAsync(object message);
+
+    protected virtual void OnReceive(object message) {}
+    
+    protected virtual Task OnReceiveAsync(object message)
+    {
+        OnReceive(message);
+        return Task.CompletedTask;
+    }
 
     public void Tell(Actor receiver, object message) =>
         EnqueueEnvelope(this, receiver, message);
@@ -67,14 +86,18 @@ public abstract class Actor
     private async Task RunMessageLoopAsync()
     {
         while (await ProcessMessages())
-            // ReSharper disable once ConvertClosureToMethodGroup
+        {
+            ActorStatus = ActorStatus.Restarting;
             RunHook(() => AfterRestart());
+        }
 
-        // ReSharper disable once ConvertClosureToMethodGroup
+        ActorStatus = ActorStatus.Stopping;
         RunHook(() => BeforeStop());
+        foreach (var child in Children)
+            child.Stop();
         Parent?.RemoveChild(Name);
 
-        if (Parent is not null)
+        if (Parent is not null && Parent.ActorStatus <= ActorStatus.Stopping)
         {
             EnqueueEnvelope(
                 sender: NullActor.Instance,
@@ -83,6 +106,7 @@ public abstract class Actor
             );
         }
         _messageProcessingTask.Dispose();
+        ActorStatus = ActorStatus.Stopped;
     }
     
     // process messages until an error occurs or the actor is stopped
@@ -93,6 +117,7 @@ public abstract class Actor
         if (exception is TaskCanceledException)
             return false;
 
+        ActorStatus = ActorStatus.ErrorHandling;
         RunHook(() => OnError(exception, _currentlyProcessing.Message));
             
         return await _restartPolicy.CanRestartAsync();
@@ -105,14 +130,14 @@ public abstract class Actor
         {
             while (true)
             {
+                ActorStatus = ActorStatus.Idle;
                 Sender = NullActor.Instance;
                 _currentlyProcessing = null;
                 
-                // could throw CanceledException if Actor stopped
                 _currentlyProcessing = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
                 Sender = _currentlyProcessing.Sender;
-                
-                // could throw, must be handled carefully
+
+                ActorStatus = ActorStatus.Processing;
                 await OnReceiveAsync(_currentlyProcessing.Message);
             }
         }

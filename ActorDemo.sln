@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorWebDemo", "ActorWebDem
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventStore", "EventStore\EventStore.csproj", "{27FE89DC-1C0E-4D94-893C-97C4DD1CB3B7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorSimpleLib", "ActorSimpleLib\ActorSimpleLib.csproj", "{05CFF58A-ED66-48E9-8932-0356123BEB5E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorLib", "ActorLib\ActorLib.csproj", "{05CFF58A-ED66-48E9-8932-0356123BEB5E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

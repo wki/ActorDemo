@@ -6,7 +6,7 @@ public class Backend: IHostedService
 {
     private readonly ILogger<Backend> _logger;
     private ActorSystem _system;
-    private IActorRef _echo;
+    private Actor _echo;
 
     public Backend(ILogger<Backend> logger)
     {

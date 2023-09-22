@@ -1,4 +1,4 @@
-namespace ActorSimpleLib.Routing;
+namespace ActorLib.Routing;
 
 public class RouterBuilder
 {

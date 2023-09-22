@@ -9,7 +9,7 @@
 
 
     <ItemGroup>
-      <ProjectReference Include="..\ActorSimpleLib\ActorSimpleLib.csproj" />
+      <ProjectReference Include="..\ActorLib\ActorLib.csproj" />
     </ItemGroup>
 
 </Project>
