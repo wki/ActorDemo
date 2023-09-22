@@ -1,13 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorLib", "ActorLib\ActorLib.csproj", "{DCD07B22-342F-4F37-8CE8-5FC2A7D8420C}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFolder", "SolutionFolder", "{58DD11E1-4401-4D0E-8051-CC51C94897FB}"
 	ProjectSection(SolutionItems) = preProject
 		README.md = README.md
 	EndProjectSection
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorLib.Tests", "ActorLib.Tests\ActorLib.Tests.csproj", "{851D167F-DD5F-4A24-9352-ACDB39DF42B5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorConsoleDemo", "ActorConsoleDemo\ActorConsoleDemo.csproj", "{EAFAC534-228D-4595-AB8D-52E297A9D9AE}"
 EndProject
@@ -23,14 +19,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DCD07B22-342F-4F37-8CE8-5FC2A7D8420C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DCD07B22-342F-4F37-8CE8-5FC2A7D8420C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DCD07B22-342F-4F37-8CE8-5FC2A7D8420C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DCD07B22-342F-4F37-8CE8-5FC2A7D8420C}.Release|Any CPU.Build.0 = Release|Any CPU
-		{851D167F-DD5F-4A24-9352-ACDB39DF42B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{851D167F-DD5F-4A24-9352-ACDB39DF42B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{851D167F-DD5F-4A24-9352-ACDB39DF42B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{851D167F-DD5F-4A24-9352-ACDB39DF42B5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{EAFAC534-228D-4595-AB8D-52E297A9D9AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{EAFAC534-228D-4595-AB8D-52E297A9D9AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EAFAC534-228D-4595-AB8D-52E297A9D9AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
