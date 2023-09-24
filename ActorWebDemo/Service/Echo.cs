@@ -6,13 +6,10 @@ public class Echo : Actor
 {
     private int _count = 0;
 
-    public Echo(Actor parent, string name): base(parent, name)
+    protected override void OnReceive(object message)
     {
-    }
-    
-    protected override Task OnReceiveAsync(object message)
-    {
-        Reply($"Echo: {message} ({++_count})");
-        return Task.CompletedTask;
+        var echo = $"Echo: {message} ({++_count})";
+        _logger.LogInformation($"Received: {message}, replying: {echo}");
+        Reply(echo);
     }
 }

@@ -3,16 +3,19 @@ namespace ActorLib.Routing;
 public class Router: Actor
 {
     private readonly IRoutingStrategy _routingStrategy;
-    
-    public Router(Actor parent, string name, IRoutingStrategy routingStrategy, Type childType, object[] childArgs) 
-        : base(parent, name)
+    private readonly Type _childType;
+    private readonly object[] _childArgs;
+
+    public Router(IRoutingStrategy routingStrategy, Type childType, object[] childArgs)
     {
         _routingStrategy = routingStrategy;
-        _routingStrategy.BuildChildren(this, childType, childArgs);
+        _childType = childType;
+        _childArgs = childArgs;
     }
 
     protected override Task OnReceiveAsync(object message)
     {
+        _routingStrategy.BuildChildren(this, _childType, _childArgs);
         Forward(_routingStrategy.ChildToForwardTo());
         return Task.CompletedTask;
     }

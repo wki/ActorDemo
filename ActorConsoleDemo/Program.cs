@@ -3,7 +3,7 @@ using ActorLib;
 using ActorLib.Routing;
 
 Console.WriteLine("ConsoleDemo");
-var system = new ActorSystem("some name");
+var system = new ActorSystem("system");
 
 var receiver = system.ActorOf<Receiver>("receiver");
 var initiator = system.ActorOf<Initiator>("initiator", receiver);
@@ -60,8 +60,6 @@ public record TimeOver(int Count, string Message);
 // Example actors -- without state...
 public class Worker : Actor
 {
-    public Worker(Actor parent, string name) : base(parent, name) { }
-
     protected override void OnReceive(object message)
     {
         Console.WriteLine($"{Self.ActorPath}: received {message} from {Sender}");
@@ -74,7 +72,7 @@ public class Initiator : Actor
     private readonly Actor _receiver;
     private readonly TimeOver _state;
 
-    public Initiator(Actor parent, string name, Actor receiver): base(parent, name)
+    public Initiator(Actor receiver)
     {
         _receiver = receiver;
         _state = new TimeOver(0, "time over");
@@ -114,8 +112,6 @@ public class Initiator : Actor
 
 public class Receiver : Actor
 {
-    public Receiver(Actor parent, string name): base(parent, name) { }
-
     protected override void OnReceive(object message)
     {
         switch (message)
@@ -137,12 +133,7 @@ public class Receiver : Actor
 
 public class PingCounter : Actor
 {
-    private int _pingCounter;
-
-    public PingCounter(Actor parent, string name) : base(parent, name)
-    {
-        _pingCounter = 0;
-    }
+    private int _pingCounter = 0;
 
     protected override void OnReceive(object message)
     {
@@ -161,7 +152,7 @@ public class Benchmark : Actor
 {
     private Stopwatch _stopwatch;
     
-    public Benchmark(Actor parent, string name, Actor pingCounter): base(parent, name)
+    public Benchmark(Actor pingCounter)
     {
         Console.WriteLine("Benchmarking...");
         _stopwatch = new Stopwatch();

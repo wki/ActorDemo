@@ -8,10 +8,10 @@ namespace ActorLib;
 /// </remarks>
 public class NullActor : Actor
 {
-    public static NullActor Instance = new NullActor();
+    public static readonly NullActor Instance = new();
 
-    private NullActor(): base(null, "NullActor") {}
-
-    protected override Task OnReceiveAsync(object message) =>
-        Task.CompletedTask;
+    private NullActor()
+    {
+        Name = "null";
+    }
 }

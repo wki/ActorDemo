@@ -16,7 +16,7 @@ public class Backend: IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("starting Backend Service...");
-        _system = new ActorSystem("backend");
+        _system = new ActorSystem("backend", _logger);
         _echo = _system.ActorOf<Echo>("echo");
         
         return Task.CompletedTask;
@@ -36,5 +36,7 @@ public class Backend: IHostedService
 
     public Task<string> Echo(object message) =>
         _system.Ask<string>(_echo, message);
-        
+
+    public IEnumerable<string> ActorPaths() =>
+        _system.AllChildPaths();
 }

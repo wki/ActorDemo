@@ -9,8 +9,7 @@ public class AskActor<T>: Actor
     private readonly Timer _timer;
     private bool _answered;
 
-    public AskActor(Actor parent, string name, Actor receiver, object question, TaskCompletionSource<T> taskCompletionSource, int timeoutMillis)
-        :base(parent, name)
+    public AskActor(Actor receiver, object question, TaskCompletionSource<T> taskCompletionSource, int timeoutMillis)
     {
         _receiver = receiver;
         _question = question;
@@ -32,11 +31,11 @@ public class AskActor<T>: Actor
         Stop();
     }
     
-    protected override Task OnReceiveAsync(object message)
+    protected override void OnReceive(object message)
     {
-        if (_answered) return Task.CompletedTask;
+        if (_answered) return;
         
-        Console.WriteLine($"{this} - received: {message}");
+        // Console.WriteLine($"{this} - received: {message}");
         if (message is T answer)
         {
             _taskCompletionSource.TrySetResult(answer);
@@ -44,7 +43,5 @@ public class AskActor<T>: Actor
             _answered = true;
             Stop();
         }
-
-        return Task.CompletedTask;
     }
 }

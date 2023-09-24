@@ -1,15 +1,22 @@
+using Microsoft.Extensions.Logging;
+
 namespace ActorLib;
 
 public class ActorSystem : Actor
 {
-    public ActorSystem(string name) : base(null, name) { }
+    public ActorSystem(string name, ILogger logger = null)
+    {
+        Name = name;
+        if (logger is not null)
+            _logger = logger;
+        Start();
+    }
 
-    protected override Task OnReceiveAsync(object message)
+    protected override void OnReceive(object message)
     {
         if (message is ChildTerminated childTerminated)
         {
-            Console.WriteLine($"Child Terminated: {childTerminated.Name}");
+            _logger.LogDebug($"Child Terminated: {childTerminated.Name}");
         }
-        return Task.CompletedTask;
     }
 }

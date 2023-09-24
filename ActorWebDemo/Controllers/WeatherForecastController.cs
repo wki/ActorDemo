@@ -47,4 +47,8 @@ public class WeatherForecastController : ControllerBase
         var echo = await _backend.Echo(message);
         return Ok(echo);
     }
+
+    [HttpGet, Route("echo/listall")]
+    public IEnumerable<string> ListAll() => 
+        _backend.ActorPaths();
 }
