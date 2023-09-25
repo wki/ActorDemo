@@ -89,6 +89,7 @@ public class Initiator : Actor
 
     protected override void OnReceive(object message)
     {
+        Console.WriteLine($"Initiator - received: {message}");
         switch (message)
         {
             case Ping ping:

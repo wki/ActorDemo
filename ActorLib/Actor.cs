@@ -5,12 +5,14 @@ using ActorLib.Restart;
 using ActorLib.Routing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using MessageHandler = System.Func<object, System.Threading.Tasks.Task>;
 
-// ReSharper disable ConvertClosureToMethodGroup
 namespace ActorLib;
 
 public abstract class Actor
 {
+    // ReSharper disable ConvertClosureToMethodGroup
+    
     public string Name { get; internal set; } = "still_unnamed";
     protected Actor Parent { get; private set; } = null;
     protected Actor Self => this;
@@ -22,9 +24,17 @@ public abstract class Actor
     private Envelope? _currentlyProcessing;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly IRestartPolicy _restartPolicy = new DelayedRestartPolicy();
+    private Queue<Envelope> _stash = new();
     private Task _messageProcessingTask;
+    private MessageHandler _messageHandlerAsync;
+    private Stack<MessageHandler> _stackedMessageHandlers = new();
     protected internal ILogger _logger = NullLogger.Instance;
 
+    public Actor()
+    {
+        _messageHandlerAsync = m => OnReceiveAsync(m);
+    }
+    
     public string ActorPath => String.Join('/', GetPath());
 
     private IEnumerable<String> GetPath() =>
@@ -75,7 +85,7 @@ public abstract class Actor
         }
 
         ActorStatus = ActorStatus.Stopping;
-        RunHook(() => BeforeStop());
+        RunHook(() => AfterStop());
         Children.ForEach(c => c.Stop());
         Parent?.RemoveChild(Name);
 
@@ -108,7 +118,7 @@ public abstract class Actor
                 Sender = _currentlyProcessing.Sender;
 
                 ActorStatus = ActorStatus.Processing;
-                await OnReceiveAsync(_currentlyProcessing.Message);
+                await _messageHandlerAsync(_currentlyProcessing.Message);
             }
         }
         catch (Exception e)
@@ -128,10 +138,11 @@ public abstract class Actor
     internal void Start() => _messageProcessingTask = RunMessageLoopAsync();
 
     public void Stop() => _cancellationTokenSource.Cancel();
-    
-    protected virtual void BeforeStop() {}
+
+    protected virtual void BeforeStart() {}
     protected virtual void OnError(Exception e, object message) {}
     protected virtual void AfterRestart() {}
+    protected virtual void AfterStop() {}
 
     private void RunHook(Action hook)
     {
@@ -169,6 +180,7 @@ public abstract class Actor
         actor.Parent = this;
         AddChild(actor.Name, actor);
         actor._logger = _logger;
+        RunHook(() => actor.BeforeStart());
         actor.Start();
         return actor;
     }
@@ -191,6 +203,32 @@ public abstract class Actor
         Children.SelectMany(c => 
             c.Children.Select(cc => cc.ActorPath).Prepend(c.ActorPath)
         );
+    #endregion
+    
+    #region Stash Management
+    protected void Stash() => _stash.Enqueue(_currentlyProcessing);
+
+    protected void UnStashAll()
+    {
+        while (_stash.Any())
+            EnqueueEnvelope(_stash.Dequeue());
+    }
+    #endregion
+    
+    #region State Handling
+    protected void Become(MessageHandler handleAsync) => 
+        _messageHandlerAsync = handleAsync;
+
+    protected void BecomeStacked(MessageHandler handleAsync)
+    {
+        _stackedMessageHandlers.Push(_messageHandlerAsync);
+        Become(handleAsync);
+    }
+
+    protected void UnBecomeStacked()
+    {
+        _messageHandlerAsync = _stackedMessageHandlers.Pop();
+    }
     #endregion
 
     public RouterBuilder WithRouter(IRoutingStrategy routingStrategy) =>

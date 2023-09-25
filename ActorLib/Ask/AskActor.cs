@@ -18,6 +18,11 @@ public class AskActor<T>: Actor
         
         _timer = new Timer(TimeOver, null, timeoutMillis, 100_000);
         _answered = false;
+    }
+
+    protected override void BeforeStart()
+    {
+        Console.WriteLine("asking...");
         Tell(_receiver, _question);
     }
 
@@ -35,7 +40,6 @@ public class AskActor<T>: Actor
     {
         if (_answered) return;
         
-        // Console.WriteLine($"{this} - received: {message}");
         if (message is T answer)
         {
             _taskCompletionSource.TrySetResult(answer);

@@ -9,6 +9,8 @@ public class ActorSystem : Actor
         Name = name;
         if (logger is not null)
             _logger = logger;
+        // ReSharper disable once ConvertClosureToMethodGroup
+        Become(m => this.OnReceiveAsync(m));
         Start();
     }
 
