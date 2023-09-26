@@ -89,7 +89,7 @@ public class Initiator : Actor
 
     protected override void OnReceive(object message)
     {
-        Console.WriteLine($"Initiator - received: {message}");
+        // Console.WriteLine($"Initiator - received: {message}");
         switch (message)
         {
             case Ping ping:
@@ -103,6 +103,9 @@ public class Initiator : Actor
             case MeaningOfLife:
                 Console.WriteLine($"{Self} MeaningOfLife received, sender: {Sender}");
                 Reply(42);
+                break;
+            case int i:
+                Console.WriteLine($"{Self} int {i} received, sender: {Sender}");
                 break;
             default:
                 Console.WriteLine($"{Self}: unhandled Message: {message}, sender: {Sender}");

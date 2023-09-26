@@ -29,8 +29,10 @@ public abstract class Actor
     private MessageHandler _messageHandlerAsync;
     private Stack<MessageHandler> _stackedMessageHandlers = new();
     protected internal ILogger _logger = NullLogger.Instance;
+    private Timer? _timer;
+    protected int ReceiveTimeoutMs;
 
-    public Actor()
+    protected Actor()
     {
         _messageHandlerAsync = m => OnReceiveAsync(m);
     }
@@ -47,6 +49,26 @@ public abstract class Actor
     {
         OnReceive(message);
         return Task.CompletedTask;
+    }
+
+    protected void SetReceiveTimeout(int milliSeconds)
+    {
+        ReceiveTimeoutMs = milliSeconds;
+        RestartTimer();
+    }
+
+    private void RestartTimer()
+    {
+        void TimerExpired(object? _)
+        {
+            Tell(this, TimeOut.Instance);
+            RestartTimer();
+        }
+        
+        _timer?.Dispose();
+        _timer = ReceiveTimeoutMs <= 0 
+            ? null 
+            : new Timer(TimerExpired, null, ReceiveTimeoutMs, Timeout.Infinite);
     }
 
     public void Tell(Actor receiver, object message) =>
@@ -116,6 +138,8 @@ public abstract class Actor
 
                 _currentlyProcessing = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
                 Sender = _currentlyProcessing.Sender;
+                
+                RestartTimer();
 
                 ActorStatus = ActorStatus.Processing;
                 await _messageHandlerAsync(_currentlyProcessing.Message);
@@ -225,10 +249,9 @@ public abstract class Actor
         Become(handleAsync);
     }
 
-    protected void UnBecomeStacked()
-    {
+    protected void UnBecomeStacked() => 
         _messageHandlerAsync = _stackedMessageHandlers.Pop();
-    }
+
     #endregion
 
     public RouterBuilder WithRouter(IRoutingStrategy routingStrategy) =>
