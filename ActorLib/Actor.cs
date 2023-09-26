@@ -14,7 +14,7 @@ public abstract class Actor
     // ReSharper disable ConvertClosureToMethodGroup
     
     public string Name { get; internal set; } = "still_unnamed";
-    protected Actor Parent { get; private set; } = null;
+    protected Actor Parent { get; private set; }
     protected Actor Self => this;
     protected internal ImmutableList<Actor> Children => _children.Values.ToImmutableList();
     protected Actor Sender { get; private set; } = NullActor.Instance;
@@ -24,13 +24,13 @@ public abstract class Actor
     private Envelope? _currentlyProcessing;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly IRestartPolicy _restartPolicy = new DelayedRestartPolicy();
-    private Queue<Envelope> _stash = new();
+    private readonly Queue<Envelope> _stash = new();
     private Task _messageProcessingTask;
     private MessageHandler _messageHandlerAsync;
-    private Stack<MessageHandler> _stackedMessageHandlers = new();
+    private readonly Stack<MessageHandler> _stackedMessageHandlers = new();
     protected internal ILogger _logger = NullLogger.Instance;
     private Timer? _timer;
-    protected int ReceiveTimeoutMs;
+    protected int ReceiveTimeoutMs { get; private set; }
 
     protected Actor()
     {
@@ -59,16 +59,12 @@ public abstract class Actor
 
     private void RestartTimer()
     {
-        void TimerExpired(object? _)
-        {
-            Tell(this, TimeOut.Instance);
-            RestartTimer();
-        }
+        if (_timer is null && ReceiveTimeoutMs <= 0) return;
         
         _timer?.Dispose();
         _timer = ReceiveTimeoutMs <= 0 
             ? null 
-            : new Timer(TimerExpired, null, ReceiveTimeoutMs, Timeout.Infinite);
+            : new Timer(_ => Tell(this, TimeOut.Instance), null, ReceiveTimeoutMs, -1);
     }
 
     public void Tell(Actor receiver, object message) =>
@@ -100,6 +96,8 @@ public abstract class Actor
     // process all messages in the entire life of the actor and handle end of life
     private async Task RunMessageLoopAsync()
     {
+        RunHook(() => BeforeStart());
+
         while (await ProcessMessagesAsync())
         {
             ActorStatus = ActorStatus.Restarting;
@@ -204,7 +202,6 @@ public abstract class Actor
         actor.Parent = this;
         AddChild(actor.Name, actor);
         actor._logger = _logger;
-        RunHook(() => actor.BeforeStart());
         actor.Start();
         return actor;
     }
@@ -251,7 +248,6 @@ public abstract class Actor
 
     protected void UnBecomeStacked() => 
         _messageHandlerAsync = _stackedMessageHandlers.Pop();
-
     #endregion
 
     public RouterBuilder WithRouter(IRoutingStrategy routingStrategy) =>
