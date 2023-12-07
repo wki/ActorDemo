@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Threading.Channels;
+using System.Threading.Tasks.Dataflow;
 using ActorLib.Restart;
 using ActorLib.Routing;
 using Microsoft.Extensions.Logging;
@@ -20,12 +20,11 @@ public abstract class Actor
     protected Actor Sender { get; private set; } = NullActor.Instance;
     public ActorStatus ActorStatus { get; private set; } = ActorStatus.Initializing;
     private readonly ConcurrentDictionary<string, Actor> _children = new();
-    private readonly Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
+    // private readonly Channel<Envelope> _mailbox = Channel.CreateUnbounded<Envelope>();
+    private ActionBlock<Envelope> _mailbox;
     private Envelope? _currentlyProcessing;
-    private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly IRestartPolicy _restartPolicy = new DelayedRestartPolicy();
     private readonly Queue<Envelope> _stash = new();
-    private Task _messageProcessingTask;
     private MessageHandler _messageHandlerAsync;
     private readonly Stack<MessageHandler> _stackedMessageHandlers = new();
     protected internal ILogger _logger = NullLogger.Instance;
@@ -47,6 +46,7 @@ public abstract class Actor
     
     protected virtual Task OnReceiveAsync(object message)
     {
+        // Console.WriteLine($"OnReceiveAsync {message}");
         OnReceive(message);
         return Task.CompletedTask;
     }
@@ -88,22 +88,72 @@ public abstract class Actor
     
     private void EnqueueEnvelope(Envelope envelope)
     {
-        // FIXME: exception when write fails?
-        if (!envelope.Receiver._mailbox.Writer.TryWrite(envelope))
+        var receiver = envelope.Receiver;
+        // Console.WriteLine($"{this}: Enqueue {envelope} - {receiver._mailbox.InputCount}");
+        if (receiver._mailbox is null)
+        {
+            // Console.WriteLine($"{this}: Stashing during start...");
+            receiver._stash.Enqueue(envelope); // we are still starting up
+        }
+        else if (!receiver._mailbox.Post(envelope))
             _logger.LogError($"{this}: could not enqueue Message {envelope.Message} from {envelope.Sender}");
     }
 
-    // process all messages in the entire life of the actor and handle end of life
-    private async Task RunMessageLoopAsync()
+    private async Task HandleEnvelopeAsync(Envelope envelope)
     {
-        RunHook(() => BeforeStart());
+        // Console.WriteLine($"Handling Envelope {envelope}");
+        _currentlyProcessing = envelope;
+        Sender = _currentlyProcessing.Sender;
+                
+        RestartTimer();
 
-        while (await ProcessMessagesAsync())
+        ActorStatus = ActorStatus.Processing;
+        try
         {
-            ActorStatus = ActorStatus.Restarting;
-            RunHook(() => AfterRestart());
+            await _messageHandlerAsync(_currentlyProcessing.Message);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError($"{this}: Exception {e.GetType().Name} occured: {e.Message}");
+            ActorStatus = ActorStatus.ErrorHandling;
+            RunHook(() => OnError(e, _currentlyProcessing.Message));
+            var canRestart = await _restartPolicy.CanRestartAsync();
+            if (!canRestart)
+            {
+                Stop();
+                return;
+            }
+            else
+            {
+                ActorStatus = ActorStatus.Restarting;
+                RunHook(() => AfterRestart());
+            }
         }
 
+        ActorStatus = ActorStatus.Idle;
+        Sender = NullActor.Instance;
+        _currentlyProcessing = null;
+    }
+    #endregion
+    
+    #region Lifecycle and hooks
+    internal void Start()
+    {
+        // Console.WriteLine($"Starting actor {this}");
+        RunHook(() => BeforeStart());
+        _mailbox = new ActionBlock<Envelope>(
+            action: envelope => HandleEnvelopeAsync(envelope),
+            dataflowBlockOptions: new ExecutionDataflowBlockOptions
+            {
+                MaxDegreeOfParallelism = 1,
+                BoundedCapacity = -1,
+                EnsureOrdered = true
+            });
+        UnStashAll();
+    }
+    
+    public void Stop()
+    {
         ActorStatus = ActorStatus.Stopping;
         RunHook(() => AfterStop());
         Children.ForEach(c => c.Stop());
@@ -117,50 +167,10 @@ public abstract class Actor
                 message: new ChildTerminated(Name)
             );
         }
-        _messageProcessingTask.Dispose();
-        _messageProcessingTask = null;
         ActorStatus = ActorStatus.Stopped;
+        
+        _mailbox.Complete();
     }
-    
-    // process messages until an error occurs or the actor is stopped
-    // returns true if actor can restart
-    private async Task<bool> ProcessMessagesAsync()
-    {
-        try
-        {
-            while (true)
-            {
-                ActorStatus = ActorStatus.Idle;
-                Sender = NullActor.Instance;
-                _currentlyProcessing = null;
-
-                _currentlyProcessing = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
-                Sender = _currentlyProcessing.Sender;
-                
-                RestartTimer();
-
-                ActorStatus = ActorStatus.Processing;
-                await _messageHandlerAsync(_currentlyProcessing.Message);
-            }
-        }
-        catch (Exception e)
-        {
-            if (e is TaskCanceledException) return false; // stopped --> no restart allowed
-
-            _logger.LogError($"{this}: Exception {e.GetType().Name} occured: {e.Message}");
-            ActorStatus = ActorStatus.ErrorHandling;
-            RunHook(() => OnError(e, _currentlyProcessing.Message));
-        }
-
-        return await _restartPolicy.CanRestartAsync();
-    }
-    #endregion
-    
-    #region Lifecycle and hooks
-    internal void Start() => _messageProcessingTask = RunMessageLoopAsync();
-
-    public void Stop() => _cancellationTokenSource.Cancel();
-
     protected virtual void BeforeStart() {}
     protected virtual void OnError(Exception e, object message) {}
     protected virtual void AfterRestart() {}
