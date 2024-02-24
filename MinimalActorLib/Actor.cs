@@ -17,6 +17,7 @@ public class Actor
         var token = _cancellationTokenSource.Token;
         _eventLoop = Task.Run(async () =>
         {
+            await OnStart();
             while (true)
             {
                 try
@@ -34,6 +35,7 @@ public class Actor
                 {
                     if (!await OnError(_envelope?.Sender, _envelope?.Message, ex))
                         break;
+                    await OnRestart();
                 }
             }
         });
@@ -54,12 +56,18 @@ public class Actor
     private bool SendMessage(Actor sender, Actor receiver, object message) =>
         receiver._mailbox.Writer.TryWrite(new Envelope(sender, message));
 
+    protected virtual Task OnStart() =>
+        Task.CompletedTask;
+    
     protected virtual Task OnReceive(Actor sender, object message) => 
         Task.CompletedTask;
 
     protected virtual Task<bool> OnError(Actor? sender, object? message, Exception ex) => 
         Task.FromResult(false);
 
+    protected virtual Task OnRestart() =>
+        Task.CompletedTask;
+    
     protected virtual Task OnStop() => 
         Task.CompletedTask;
 }
