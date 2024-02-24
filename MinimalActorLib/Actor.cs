@@ -54,9 +54,12 @@ public class Actor
     private bool SendMessage(Actor sender, Actor receiver, object message) =>
         receiver._mailbox.Writer.TryWrite(new Envelope(sender, message));
 
-    protected virtual Task OnReceive(Actor sender, object message) => Task.CompletedTask;
+    protected virtual Task OnReceive(Actor sender, object message) => 
+        Task.CompletedTask;
 
-    protected virtual Task<bool> OnError(Actor? sender, object? message, Exception ex) => Task.FromResult(false);
+    protected virtual Task<bool> OnError(Actor? sender, object? message, Exception ex) => 
+        Task.FromResult(false);
 
-    protected virtual Task OnStop() => Task.CompletedTask;
+    protected virtual Task OnStop() => 
+        Task.CompletedTask;
 }

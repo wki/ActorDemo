@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventStore", "EventStore\Ev
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActorLib", "ActorLib\ActorLib.csproj", "{05CFF58A-ED66-48E9-8932-0356123BEB5E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimalActorLib", "MinimalActorLib\MinimalActorLib.csproj", "{4E64229E-F26F-4932-9E38-7815C6D8D5E6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,5 +37,9 @@ Global
 		{05CFF58A-ED66-48E9-8932-0356123BEB5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05CFF58A-ED66-48E9-8932-0356123BEB5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05CFF58A-ED66-48E9-8932-0356123BEB5E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E64229E-F26F-4932-9E38-7815C6D8D5E6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E64229E-F26F-4932-9E38-7815C6D8D5E6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E64229E-F26F-4932-9E38-7815C6D8D5E6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E64229E-F26F-4932-9E38-7815C6D8D5E6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
