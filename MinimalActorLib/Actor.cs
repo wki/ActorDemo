@@ -64,21 +64,47 @@ public class Actor
     
     private void RestartTimer()
     {
-        if (_timer is null && ReceiveTimeoutMs <= 0) return;
-        
-        _timer?.Dispose();
-        _timer = ReceiveTimeoutMs <= 0 
-            ? null 
-            : new Timer(_ => Tell(this, TimeOut.Instance), null, ReceiveTimeoutMs, -1);
+        if (_timer is null)
+        {
+            if (ReceiveTimeoutMs > 0)
+                _timer = new Timer(_ => Tell(this, TimeOut.Instance), null, ReceiveTimeoutMs, -1); 
+        }
+        else
+        {
+            if (ReceiveTimeoutMs <= 0)
+            {
+                _timer.Dispose();
+                _timer = null;
+            }
+            else
+            {
+                _timer.Change(ReceiveTimeoutMs, -1);    
+            }
+        }
     }
 
     public void Stop() =>
         _cancellationTokenSource.Cancel();
     
+    public Actor ActorOf<T>(params object[] ctorArgs) where T : Actor => 
+        ActorOf(typeof(T), ctorArgs);
+
+    public Actor ActorOf(Type actorType, params object[] ctorArgs)
+    {
+        var ctorArgTypes = ctorArgs
+            .Select(a => a.GetType())
+            .ToArray();
+        var ctor = actorType
+            .GetConstructor(ctorArgTypes)
+            ?? throw new ArgumentException($"No ctor in class {actorType.Name} found for provided arguments ({String.Join(", ", ctorArgTypes.Select(t => t.Name))})");
+        
+        return ctor.Invoke(ctorArgs.ToArray()) as Actor;
+    }
+    
     public bool Tell(Actor receiver, object message) =>
         SendMessage(this, receiver, message);
 
-    protected Task<T> Ask<T>(Actor receiver, object question, int timeOutMs = 500)
+    public Task<T> Ask<T>(Actor receiver, object question, int timeOutMs = 500)
     {
         var answer = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         new AskActor<T>(receiver, question, answer, timeOutMs);
@@ -110,5 +136,5 @@ public class Actor
         Task.CompletedTask;
 
     public override string ToString() =>
-        $"[{GetType().Name} {GetHashCode()}]";
+        $"[Actor {GetType().Name} {GetHashCode()}]";
 }
