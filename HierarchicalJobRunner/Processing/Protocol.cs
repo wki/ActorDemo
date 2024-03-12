@@ -3,11 +3,17 @@ namespace HierarchicalJobRunner.Processing;
 // tell an executor to start execution
 public record Start();
 
+public record Cancel();
+
 // executor tells its parent that it has started
-public record Started(Guid id);
+public record ChildStarted(Guid Id);
 
 // executor tells its parent that it has failed
-public record Failed(Guid id);
+public record ChildFailed(Guid Id);
 
 // executor tells its parent that it has completed
-public record Completed(Guid id);
+public record ChildCompleted(Guid Id);
+
+public record ChildCanceled(Guid Id);
+
+public record ChildTimedOut(Guid Id);

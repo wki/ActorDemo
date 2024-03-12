@@ -29,6 +29,3 @@ var tree = new Group
 var processor = new Processor(tree);
 await Task.Delay(20000);
 await Task.Delay(20000);
-Thread.Sleep(20000);
-Thread.Sleep(20000);
-Thread.Sleep(20000);

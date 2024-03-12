@@ -23,7 +23,7 @@ public class NodeExecutor: Actor
 
     protected override Task OnReceive(object message)
     {
-        Console.WriteLine($"{this}: {_node.GetType().Name} '{_node.Name}' received {message.GetType().Name}");
+        Console.WriteLine($"{this}: {_node.GetType().Name} '{_node.Name}' received {message.GetType().Name} from {Sender}");
 
         switch (message)
         {
@@ -33,22 +33,30 @@ public class NodeExecutor: Actor
                     Tell(_executors.First(), new Start());
                 break;
             
-            case Started:
-                if (_nrStarted++ == 0)
-                    Tell(_parent, new Started(_node.Id));
+            case ChildStarted:
+                if (_nrStarted++ == 0 && _parent is not null)
+                    Tell(_parent, new ChildStarted(_node.Id));
                 break;
             
-            case Completed:
+            case ChildCompleted:
                 ++_nrCompleted;
                 if (_nrCompleted < _node.Children.Count)
                     Tell(_executors.Skip(_nrCompleted).First(), new Start());
+                else if (_nrCompleted == _node.Children.Count && _parent is not null)
+                    Tell(_parent, new ChildCompleted(_node.Id));
                 else if (_nrCompleted == _node.Children.Count)
-                    Tell(_parent, new Completed(_node.Id));
+                    Console.WriteLine("*** COMPLETED");
                 break;
             
-            case Failed:
+            case ChildFailed:
                 if (++_nrFailed == 1)
-                    Tell(_parent, new Failed(_node.Id));
+                {
+                    if (_parent is not null)
+                        Tell(_parent, new ChildFailed(_node.Id));
+
+                    Console.WriteLine("*** FAILED");
+                }
+
                 break;
         }
 

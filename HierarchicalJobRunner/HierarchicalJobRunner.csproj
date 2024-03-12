@@ -11,4 +11,8 @@
       <ProjectReference Include="..\MinimalActorLib\MinimalActorLib.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Running\" />
+    </ItemGroup>
+
 </Project>
