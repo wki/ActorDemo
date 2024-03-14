@@ -10,6 +10,7 @@ public class NodeExecutor: Actor
     private readonly List<Actor> _executors;
     private int _nrStarted = 0;
     private int _nrCompleted = 0;
+    private int _nrCanceled = 0;
     private int _nrFailed = 0;
 
     public NodeExecutor(Node node, Actor parent)
@@ -33,9 +34,40 @@ public class NodeExecutor: Actor
                     Tell(_executors.First(), new Start());
                 break;
             
+            case Cancel cancel:
+            case Retry retry:
+            case Skip skip:
+                // let the child decide if operation is interesting...
+                foreach (var child in _executors)
+                    Forward(child);
+                break;
+            
             case ChildStarted:
-                if (_nrStarted++ == 0 && _parent is not null)
+                // in case of a retry _nrStarted could be > _node.Children.Count
+                if (_nrStarted++ == 0)
                     Tell(_parent, new ChildStarted(_node.Id));
+                break;
+            
+            case ChildFailed:
+                // in case of a retry _nrFailed could be > _node.Children.Count
+                if (++_nrFailed == 1)
+                {
+                    Tell(_parent, new ChildFailed(_node.Id));
+
+                    Console.WriteLine("*** FAILED");
+                }
+                break;
+
+            case ChildSkipped skipped:
+                var index = _node.Children.FindIndex(c => c.Id == skipped.Id);
+                if (index >= 0)
+                {
+                    // either start next child or tell parent that we are complete
+                    if (index <= _node.Children.Count)
+                        Tell(_executors[index + 1], new Start());
+                    else
+                        Tell(_parent, new ChildCompleted(_node.Id));
+                }
                 break;
             
             case ChildCompleted:
@@ -48,16 +80,16 @@ public class NodeExecutor: Actor
                     Console.WriteLine("*** COMPLETED");
                 break;
             
-            case ChildFailed:
-                if (++_nrFailed == 1)
+            case ChildCanceled:
+                if (++_nrCanceled == 1)
                 {
                     if (_parent is not null)
-                        Tell(_parent, new ChildFailed(_node.Id));
+                        Tell(_parent, new ChildCanceled(_node.Id));
 
-                    Console.WriteLine("*** FAILED");
+                    Console.WriteLine("*** CANCELED");
                 }
-
                 break;
+
         }
 
         return Task.CompletedTask;
