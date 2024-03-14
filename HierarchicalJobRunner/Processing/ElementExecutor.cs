@@ -47,7 +47,7 @@ public class ElementExecutor: Actor
             case Start:
             case Retry retry when retry.Id == _element.Id && _runStatus > RunStatus.Skipped:
                 _cancellationTokenSource = new CancellationTokenSource();
-                if (_element is IWithTimeout timeoutElement)
+                if (_element is IWithTimeout timeoutElement && timeoutElement.TimeoutMs > 0)
                     _cancellationTokenSource.CancelAfter(timeoutElement.TimeoutMs);
                 _task = _runner.RunAsync(_cancellationTokenSource.Token);
                 _task.ContinueWith(OnTaskCompleted);
@@ -68,6 +68,7 @@ public class ElementExecutor: Actor
 
     private void OnTaskCompleted(Task t)
     {
+        Console.WriteLine($"Task completed with status: {t.Status}");
         switch (t.Status)
         {
             case TaskStatus.Canceled:

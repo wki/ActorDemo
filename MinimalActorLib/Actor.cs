@@ -118,7 +118,8 @@ public class Actor
         SendMessage(Sender, receiver, _message);
     
     private bool SendMessage(Actor sender, Actor receiver, object message) =>
-        receiver._mailbox.Writer.TryWrite(new Envelope(sender, message));
+        receiver is not null
+        && receiver._mailbox.Writer.TryWrite(new Envelope(sender, message));
 
     protected virtual Task OnStart() =>
         Task.CompletedTask;
