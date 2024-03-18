@@ -2,6 +2,9 @@
 
 using HierarchicalJobRunner.Job;
 using HierarchicalJobRunner.Processing;
+using MinimalActorLib;
+
+var system = new ActorSystem();
 
 var tree = new Group
 {
@@ -26,6 +29,7 @@ var tree = new Group
     ]
 };
 
-var processor = new Processor(tree);
+var processor = system.ActorOf<NodeExecutor>(tree);
+system.Tell(processor, new Start());
 await Task.Delay(20000);
 await Task.Delay(20000);

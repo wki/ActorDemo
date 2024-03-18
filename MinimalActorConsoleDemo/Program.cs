@@ -3,17 +3,17 @@ using MinimalActorLib;
 using MinimalActorLib.Routing;
 
 Console.WriteLine("ConsoleDemo");
-var system = new Actor();
+var system = new ActorSystem();
 
-var receiver = new Receiver();
-var initiator = new Initiator(receiver);
+var receiver = system.ActorOf<Receiver>();
+var initiator = system.ActorOf<Initiator>(receiver);
 
 // send a message to initiator. Origin === system.
 // replies to here would be a dead letter...
 system.Tell(initiator, new Ping("hello"));
 
 // ask an actor for a result (async)
-var result = await system.Ask<int>(initiator, new MeaningOfLife());
+var result = await system.AskAsync<int>(initiator, new MeaningOfLife());
 Console.WriteLine($"Received answer: {result}");
 
 // instantiate a router with 5 routee-actors
@@ -25,7 +25,7 @@ for (var i=0; i < 10; i++)
 
 try
 {
-    var result2 = await system.Ask<int>(initiator, 42);
+    var result2 = await system.AskAsync<int>(initiator, 42);
     Console.WriteLine($"Received answer2: {result2} -- should not occur");
 }
 catch (Exception e)
@@ -56,7 +56,7 @@ public record TimeOver(int Count, string Message);
 // Example actors -- without state...
 public class Worker : Actor
 {
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         Console.WriteLine($"{this}: received {message} from {Sender}");
         return Task.CompletedTask;
@@ -84,7 +84,7 @@ public class Initiator : Actor
         state = new TimeOver(state.Count + 1, state.Message);
     }
 
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         // Console.WriteLine($"Initiator - received: {message}");
         switch (message)
@@ -115,7 +115,7 @@ public class Initiator : Actor
 
 public class Receiver : Actor
 {
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         switch (message)
         {
@@ -140,7 +140,7 @@ public class PingCounter : Actor
 {
     private int _pingCounter = 0;
 
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         if (message is Ping ping)
         {
@@ -172,7 +172,7 @@ public class Benchmark : Actor
         });
     }
 
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         if (message is Pong pong)
         {

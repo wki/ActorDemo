@@ -13,7 +13,7 @@ public class Router: Actor
         _childArgs = childArgs;
     }
 
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         _routingStrategy.BuildChildren(this, _childType, _childArgs);
         Forward(_routingStrategy.ChildToForwardTo());

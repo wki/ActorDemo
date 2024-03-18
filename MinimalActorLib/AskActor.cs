@@ -20,13 +20,13 @@ internal class AskActor<T>: Actor
         SetReceiveTimeout(timeoutMs);
     }
 
-    protected override Task OnStart()
+    protected override Task OnStartAsync()
     {
         Tell(_receiver, _question);
         return Task.CompletedTask;
     }
 
-    protected override Task OnReceive(object message)
+    protected override Task OnReceiveAsync(object message)
     {
         switch (message)
         {
