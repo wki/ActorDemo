@@ -17,7 +17,7 @@ internal class AskActor<T>: Actor
         _question = question;
         _taskCompletionSource = taskCompletionSource;
         _timeoutMs = timeoutMs;
-        SetReceiveTimeout(timeoutMs);
+        ReceiveTimeoutMs = timeoutMs;
     }
 
     protected override Task OnStartAsync()
@@ -41,5 +41,12 @@ internal class AskActor<T>: Actor
         }
 
         return Task.CompletedTask;
+    }
+
+    protected override Task<bool> OnErrorAsync(object? message, Exception ex)
+    {
+        // last chance. try to forward the exception we received, although unlikely
+        _taskCompletionSource.TrySetException(ex);
+        return Task.FromResult(false);
     }
 }

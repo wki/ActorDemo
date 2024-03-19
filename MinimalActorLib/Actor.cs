@@ -12,7 +12,14 @@ public class Actor
     protected Actor? Parent;
     protected Actor? Sender;
     private Timer? _timer;
-    protected int ReceiveTimeoutMs { get; private set; } = 0;
+
+    private int _receiveTimeoutMs = 0;
+
+    protected int ReceiveTimeoutMs
+    {
+        get => _receiveTimeoutMs;
+        set { _receiveTimeoutMs = value; RestartTimer(); }
+    }
     private object? _message;
     public ActorStatus ActorStatus { get; private set; } = ActorStatus.Initializing; 
     private readonly Task _eventLoop;
@@ -21,38 +28,39 @@ public class Actor
     
     protected Actor()
     {
-        _eventLoop = Task.Run(EventLoop);
+        _eventLoop = EventLoop();
     }
     
     private async Task EventLoop()
     {
-        await CarefullyAsync(OnStartAsync);
+        await OnStartAsync().IgnoreExceptions();
 
         while (true)
         {
+            Sender = null;
+            RestartTimer();
+            ActorStatus = ActorStatus.Idle;
+
             try
             {
-                Sender = null;
-                ActorStatus = ActorStatus.Idle;
-                RestartTimer();
                 (Sender, _message) = await _mailbox.Reader.ReadAsync(_cancellationTokenSource.Token);
                 ActorStatus = ActorStatus.Processing;
                 await OnReceiveAsync(_message);
             }
-            catch (TaskCanceledException _)
+            catch (TaskCanceledException)
             {
-                // will be raised when Stop() is called
+                // will be raised when Stop() is called -> halt this Actor
                 break;
             }
             catch (Exception ex)
             {
-                
+                // exception in user code occured and must be handled
                 ActorStatus = ActorStatus.ErrorHandling;
-                if (!await CarefullyAsync(() => OnErrorAsync(_message, ex)))
+                if (!await OnErrorAsync(_message, ex).IgnoreExceptions())
                     break;
 
                 ActorStatus = ActorStatus.Restarting;
-                await CarefullyAsync(OnRestartAsync);
+                await OnRestartAsync().IgnoreExceptions();
             }
         }
 
@@ -61,50 +69,22 @@ public class Actor
         _timer = null;
         
         ActorStatus = ActorStatus.Stopping;
-        await CarefullyAsync(OnStopAsync);
+        await OnStopAsync().IgnoreExceptions();
         ActorStatus = ActorStatus.Stopped;
         Tell(Parent, new Terminated(this));
+        
+        Parent = null;
+        Sender = null;
+        _message = null;
+        _cancellationTokenSource.Dispose();
+        _eventLoop.Dispose();
     }
 
-    private Task<T> CarefullyAsync<T>(Func<Task<T>> action)
-    {
-        try
-        {
-            return action();
-        }
-        catch (Exception)
-        {
-            // do nothing
-        }
-
-        return Task.FromResult(default(T));
-    }
-    
-    private Task CarefullyAsync(Func<Task> action)
-    {
-        try
-        {
-            return action();
-        }
-        catch (Exception)
-        {
-            // do nothing
-        }
-    
-        return Task.CompletedTask;
-    }
-    
-    protected void SetReceiveTimeout(int milliSeconds)
-    {
-        ReceiveTimeoutMs = milliSeconds;
-        RestartTimer();
-    }
-    
     private void RestartTimer()
     {
         if (_timer is null)
         {
-            if (ReceiveTimeoutMs > 0)
+            if (_receiveTimeoutMs > 0)
                 _timer = new Timer(
                     callback: _ =>
                     {
@@ -112,19 +92,21 @@ public class Actor
                             Tell(this, TimeOut.Instance);
                     },
                     state: null,
-                    dueTime: ReceiveTimeoutMs,
+                    dueTime: _receiveTimeoutMs,
                     period: -1); 
         }
         else
         {
-            if (ReceiveTimeoutMs <= 0)
+            if (_receiveTimeoutMs <= 0)
             {
                 _timer.Dispose();
                 _timer = null;
             }
             else
             {
-                _timer.Change(ReceiveTimeoutMs, -1);    
+                _timer.Change(
+                    dueTime: _receiveTimeoutMs,
+                    period: -1);    
             }
         }
     }
@@ -134,38 +116,40 @@ public class Actor
     public Actor ActorOf<T>(params object[] ctorArgs) where T : Actor => 
         ActorOf(typeof(T), ctorArgs);
 
-    public Actor ActorOf(Type actorType, params object[] ctorArgs)
+    internal Actor ActorOf(Type actorType, params object[] ctorArgs)
     {
         var ctorArgTypes = ctorArgs
             .Select(a => a.GetType())
             .ToArray();
         var ctor = actorType
             .GetConstructor(ctorArgTypes)
-            ?? throw new ArgumentException($"No ctor in class {actorType.Name} found for provided arguments ({String.Join(", ", ctorArgTypes.Select(t => t.Name))})");
+            ?? throw new ArgumentException($"No ctor in class {actorType.Name} found for provided arguments ({string.Join(", ", ctorArgTypes.Select(t => t.Name))})");
         
-        var actor = ctor.Invoke(ctorArgs.ToArray()) as Actor;
+        var actor = ctor.Invoke(ctorArgs.ToArray()) as Actor
+            ?? throw new InvalidCastException($"class {actorType.Name} is not derived from Actor");
         actor.Parent = this;
         return actor;
     }
     
-    public bool Tell(Actor receiver, object message) => 
+    public bool Tell(Actor? receiver, object message) =>
         SendMessage(this, receiver, message);
 
     public Task<T> AskAsync<T>(Actor receiver, object question, int timeOutMs = 500)
     {
         var answer = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        new AskActor<T>(receiver, question, answer, timeOutMs);
+        ActorOf<AskActor<T>>(receiver, question, answer, timeOutMs);
         return answer.Task;
     }
     
-    protected bool Reply(object message) => 
+    protected bool Reply(object message) =>
         SendMessage(this, Sender, message);
 
-    protected bool Forward(Actor receiver) => 
-        SendMessage(Sender, receiver, _message);
+    protected bool Forward(Actor? receiver) =>
+        SendMessage(Sender!, receiver, _message!);
     
-    private bool SendMessage(Actor sender, Actor receiver, object message) =>
+    private static bool SendMessage(Actor sender, Actor? receiver, object message) =>
         receiver is not null
+        && receiver.ActorStatus < ActorStatus.Stopping
         && receiver._mailbox.Writer.TryWrite(new Envelope(sender, message));
     
     protected virtual Task OnStartAsync() =>
@@ -174,7 +158,7 @@ public class Actor
     protected virtual Task OnReceiveAsync(object message) =>
         Task.CompletedTask;
 
-    protected virtual Task<bool> OnErrorAsync(object? message, Exception ex) => 
+    protected virtual Task<bool> OnErrorAsync(object? message, Exception ex) =>
         Task.FromResult(false);
 
     protected virtual Task OnRestartAsync() =>
