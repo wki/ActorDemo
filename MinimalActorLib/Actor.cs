@@ -124,7 +124,6 @@ public class Actor
         var ctor = actorType
             .GetConstructor(ctorArgTypes)
             ?? throw new ArgumentException($"No ctor in class {actorType.Name} found for provided arguments ({string.Join(", ", ctorArgTypes.Select(t => t.Name))})");
-        
         var actor = ctor.Invoke(ctorArgs.ToArray()) as Actor
             ?? throw new InvalidCastException($"class {actorType.Name} is not derived from Actor");
         actor.Parent = this;
