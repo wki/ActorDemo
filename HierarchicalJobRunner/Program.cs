@@ -36,4 +36,3 @@ var finished = await system.AskAsync<Finished>(processor, new Start(), 10000);
 Console.WriteLine($"Job finished with RunStatus: {finished.RunStatus}");
 
 await Task.Delay(20000);
-await Task.Delay(20000);

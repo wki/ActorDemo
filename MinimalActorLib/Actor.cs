@@ -26,7 +26,7 @@ public class Actor
 
     // TODO: maybe add "Name" properties
     
-    private void Run()
+    private void Start()
     {
         _eventLoop = EventLoop();
     }
@@ -127,7 +127,7 @@ public class Actor
         var actor = ctor.Invoke(ctorArgs.ToArray()) as Actor
             ?? throw new InvalidCastException($"class {actorType.Name} is not derived from Actor");
         actor.Parent = this;
-        actor.Run();
+        actor.Start();
         return actor;
     }
     
