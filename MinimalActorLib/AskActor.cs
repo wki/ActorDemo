@@ -13,6 +13,7 @@ internal class AskActor<T>: Actor
 
     public AskActor(Actor receiver, object question, TaskCompletionSource<T> taskCompletionSource, int timeoutMs)
     {
+        Console.WriteLine($"Instantiate AskActor with receiver={receiver}");
         _receiver = receiver;
         _question = question;
         _taskCompletionSource = taskCompletionSource;

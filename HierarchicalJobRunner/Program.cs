@@ -29,7 +29,11 @@ var tree = new Group
     ]
 };
 
-var processor = system.ActorOf<NodeExecutor>(tree);
-system.Tell(processor, new Start());
+var processor = system.ActorOf<GroupExecutor>(tree);
+// system.Tell(processor, new Start());
+
+var finished = await system.AskAsync<Finished>(processor, new Start(), 10000);
+Console.WriteLine($"Job finished with RunStatus: {finished.RunStatus}");
+
 await Task.Delay(20000);
 await Task.Delay(20000);

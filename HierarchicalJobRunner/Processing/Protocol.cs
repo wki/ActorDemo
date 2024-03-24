@@ -3,6 +3,9 @@ namespace HierarchicalJobRunner.Processing;
 // tell an executor to start execution
 public record Start();
 
+// initiator of Start() will receive this message
+public record Finished(RunStatus RunStatus);
+
 // tell an executor to cancel execution for an element given by Id
 public record Cancel(Guid Id);
 

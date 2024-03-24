@@ -22,11 +22,11 @@ public class Actor
     }
     private object? _message;
     public ActorStatus ActorStatus { get; private set; } = ActorStatus.Initializing; 
-    private readonly Task _eventLoop;
+    private Task _eventLoop;
 
     // TODO: maybe add "Name" properties
     
-    protected Actor()
+    private void Run()
     {
         _eventLoop = EventLoop();
     }
@@ -127,6 +127,7 @@ public class Actor
         var actor = ctor.Invoke(ctorArgs.ToArray()) as Actor
             ?? throw new InvalidCastException($"class {actorType.Name} is not derived from Actor");
         actor.Parent = this;
+        actor.Run();
         return actor;
     }
     
@@ -135,6 +136,7 @@ public class Actor
 
     public Task<T> AskAsync<T>(Actor receiver, object question, int timeOutMs = 500)
     {
+        Console.WriteLine($"about to tell {question} to {receiver}");
         var answer = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         ActorOf<AskActor<T>>(receiver, question, answer, timeOutMs);
         return answer.Task;
