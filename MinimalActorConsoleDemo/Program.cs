@@ -17,7 +17,9 @@ var result = await system.AskAsync<int>(initiator, new MeaningOfLife());
 Console.WriteLine($"Received answer: {result}");
 
 // instantiate a router with 5 routee-actors
-var worker = new Router(new RoundRobinPool(5), typeof(Worker));
+var worker = system
+    .WithRouter<RoundRobinPool>(5)
+    .ActorOf<Worker>(/* currently: no worker args*/);
 Console.WriteLine($"Worker = {worker} ({worker.GetType().Name})");
 
 for (var i=0; i < 10; i++)
@@ -34,11 +36,12 @@ catch (Exception e)
 }
 
 
-var pingCounter = new PingCounter();
-var benchmark = new Benchmark(pingCounter);
+var pingCounter = system.ActorOf<PingCounter>();
+var benchmark = system.ActorOf<Benchmark>(pingCounter);
 
 // do something to keep actorsystem alive...
 await Task.Delay(TimeSpan.FromSeconds(30));
+Console.WriteLine("End of Console Demo");
 
 // -----------------
 
@@ -56,6 +59,12 @@ public record TimeOver(int Count, string Message);
 // Example actors -- without state...
 public class Worker : Actor
 {
+    protected override Task OnStartAsync()
+    {
+        Console.WriteLine($"Worker {this} initialized");
+        return Task.CompletedTask;
+    }
+
     protected override Task OnReceiveAsync(object message)
     {
         Console.WriteLine($"{this}: received {message} from {Sender}");
@@ -74,6 +83,12 @@ public class Initiator : Actor
         _receiver = receiver;
         _state = new TimeOver(0, "time over");
         _timer = new Timer(TimerElapsed, _state, TimeSpan.FromSeconds(0), TimeSpan.FromSeconds(3));
+    }
+
+    protected override Task OnStartAsync()
+    {
+        Console.WriteLine("Initiator OnStart");
+        return Task.CompletedTask;
     }
 
     private void TimerElapsed(object o)
@@ -157,19 +172,28 @@ public class PingCounter : Actor
 
 public class Benchmark : Actor
 {
+    private readonly Actor _pingCounter;
     private Stopwatch _stopwatch;
     
     public Benchmark(Actor pingCounter)
     {
+        _pingCounter = pingCounter;
+    }
+
+    protected override Task OnStartAsync()
+    {
         Console.WriteLine("Benchmarking...");
         _stopwatch = new Stopwatch();
         _stopwatch.Start();
+
         Task.Run(() =>
         {
             var ping = new Ping("hi");
             for (var i = 0; i < 1_000_000; i++)
-                Tell(pingCounter, ping);
+                Tell(_pingCounter, ping);
         });
+
+        return Task.CompletedTask;
     }
 
     protected override Task OnReceiveAsync(object message)

@@ -2,11 +2,11 @@
 
 internal static class HandleWithCare
 {
-    public static async Task IgnoreExceptions(this Task task)
+    public static async Task IgnoreExceptions(this Task taskWhichCouldThrow)
     {
         try
         {
-            await task;
+            await taskWhichCouldThrow;
         }
         catch
         {
@@ -14,17 +14,17 @@ internal static class HandleWithCare
         }
     }
 
-    public static async Task<T> IgnoreExceptions<T>(this Task<T> task)
+    public static async Task<T> IgnoreExceptions<T>(this Task<T> taskWhichCouldThrow)
     {
         try
         {
-            return await task;
+            return await taskWhichCouldThrow;
         }
         catch
         {
             // simply ignore errors
         }
 
-        return default(T)!;
+        return default!;
     }
 }

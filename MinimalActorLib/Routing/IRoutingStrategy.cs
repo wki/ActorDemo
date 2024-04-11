@@ -2,6 +2,6 @@ namespace MinimalActorLib.Routing;
 
 public interface IRoutingStrategy
 {
-    void BuildChildren(Actor router, Type childType, object[] childArgs);
+    void BuildChildren(Actor router);
     Actor ChildToForwardTo();
 }

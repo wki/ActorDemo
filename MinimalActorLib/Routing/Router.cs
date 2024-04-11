@@ -3,19 +3,15 @@ namespace MinimalActorLib.Routing;
 public class Router: Actor
 {
     private readonly IRoutingStrategy _routingStrategy;
-    private readonly Type _childType;
-    private readonly object[] _childArgs;
 
-    public Router(IRoutingStrategy routingStrategy, Type childType, params object[] childArgs)
+    public Router(IRoutingStrategy routingStrategy)
     {
         _routingStrategy = routingStrategy;
-        _childType = childType;
-        _childArgs = childArgs;
     }
 
     protected override Task OnReceiveAsync(object message)
     {
-        _routingStrategy.BuildChildren(this, _childType, _childArgs);
+        _routingStrategy.BuildChildren(this);
         Forward(_routingStrategy.ChildToForwardTo());
         return Task.CompletedTask;
     }

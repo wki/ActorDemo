@@ -1,7 +1,7 @@
 namespace HierarchicalJobRunner.Processing;
 
 // tell an executor to start execution
-public record Start();
+public record Start;
 
 // initiator of Start() will receive this message
 public record Finished(RunStatus RunStatus);
